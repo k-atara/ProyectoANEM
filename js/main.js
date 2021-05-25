@@ -1,681 +1,1115 @@
-import * as THREE from "../build/three.module.js";
-import Stats from "../js/jsm/libs/stats.module.js";
-import {OrbitControls} from "../js/jsm/controls/OrbitControls.js";
-import * as dat from "../js/jsm/libs/dat.gui.module.js";
 
-"use strict";
+"using strict";
 
-let renderer, scene, camera, mesh, cameraControl, stats, raycaster, mouse, model;
+let renderer, scene, camera, cameraControl, skybox, stats, mesh, start, sprint, blockBox;
+let texture1, texture2, texture3, texture4, texture5, texture6;
+let materialArray, dirtMaterialArray, woodMaterialArray, model; 
 
-let listColors = ["White", "Black", "Red", "Blue", "Pink", "Green", "Yellow", "Purple", "Orange", "Gray", "Aqua", "Burlywood"];
+let spotLightHelper, cameraHelper;
 
-class Mesh extends THREE.Mesh {
-    constructor() {
-        super();
+var deceleration = 1.15;
+var forback = 0; // 1 = forward, -1 = backward
+var rightleft = 0; // 1 = right, -1 = left
+var sprintSpeedInc = 1.3; // 30% faster than walking
+
+var movingSpeed = 0.7;
+var ySpeed = 0;
+var acc = 0.065;
+
+camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+var player = {
+    w : 0.6, // width
+    h : 8, // height
+    d : 0.5, // depth
+    x : camera.position.x,
+    y : camera.position.y,
+    z : camera.position.z,
+    forward : function(speed){
+        controls.moveForward(speed);
+        this.updatePosition();
+    },
+    backward : function(speed){
+        controls.moveForward(-1 * speed);
+        this.updatePosition();
+    },
+    right : function(speed){
+        controls.moveRight(speed);
+        this.updatePosition();
+    },
+    left : function(speed){
+        controls.moveRight(-1 * speed);
+        this.updatePosition();
+    },
+    updatePosition : function(){
+        this.x = camera.position.x;
+        this.y = camera.position.y - (this.h / 2);
+        this.z = camera.position.z;
     }
-    setWireframe(value) {
-        this.material.wireframe = value;
-    }
-    callback = function () {
-        mesh = this;
-        model.name = this.name;
-        model.wireframe = this.material.wireframe;
-        model.posX = this.position.x;
-        model.posY = this.position.y;
-        model.posZ = this.position.z;
-        model.rotX = (this.rotation.x * 180) / Math.PI;
-        model.rotY = (this.rotation.y * 180) / Math.PI;
-        model.rotZ = (this.rotation.z * 180) / Math.PI;
-        model.colorPalette = [
-        mesh.material.color.r * 255,
-        mesh.material.color.g * 255,
-        mesh.material.color.b * 255,
-        ];
-    };
+};
+
+var keys = [];
+var canJump = true;
+var controlOptions = {
+    forward : "w",
+    backward : "s",
+    right : "d",
+    left : "a",
+    jump : " ", // " " = space
+    placeBlock : "q" 
+};
+var faces = [
+    { // left
+        dir: [ -5,  0,  0, "left"],
+    },
+    { // right
+        dir: [  5,  0,  0, "right"],
+    },
+    { // bottom
+        dir: [  0, -5,  0, "bottom"],
+    },
+    { // top
+        dir: [  0,  5,  0, "top"],
+    },
+    { // back
+        dir: [  0,  0, -5, "back"],
+    },
+    { // front
+        dir: [  0,  0,  5, "front"],
+    },
+];
+
+function Block(x, y, z, material, placed){
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    this.material = material;
+    this.placed = placed;
+    
 }
 
-class Quad extends Mesh {
-    constructor(){
-        super();
-        //QUAD
-        let vertices = [-1, 1, 0,
-                        -1, -1, 0,
-                        1, -1, 0,
-                        1, 1, 0];
-        let indices = [0, 1, 2,   
-                    0, 2, 3];
+var chunks = [];
+var amplitude = 30 + (Math.random() * 70);
+var renderDistance = 5;
+var chunkSize = 10;
+var placedBlocks = [];
+var instancedChunk = [];
+var chunkMap = [];
 
-        this.geometry = new  THREE.BufferGeometry();
-        this.geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-        this.geometry.setIndex(indices);
-        this.material = new THREE.MeshBasicMaterial({color: "white", wireframe: false, side: THREE.DoubleSide});
-    }
-}
+function init(){
 
-class Cube extends Mesh {
-    constructor(){
-        super();
-        //CUBE
-        let vertices = [-1,-1,-1,    
-                        1,-1,-1,    
-                        1, 1,-1,    
-                        -1, 1,-1,
-                        -1,-1, 1,    
-                        1,-1, 1,    
-                        1, 1, 1,    
-                        -1, 1, 1];
-        let indices = [2,1,0,    0,3,2,
-                        0,4,7,    7,3,0,
-                        0,1,5,    5,4,0,
-                        1,2,6,    6,5,1,
-                        2,3,7,    7,6,2,
-                        4,5,6,    6,7,4];
-        this.geometry = new  THREE.BufferGeometry();
-        this.geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-        this.geometry.setIndex(indices);
-        this.material = new THREE.MeshBasicMaterial({color: "white", wireframe: false, side: THREE.DoubleSide});
-    }
-}
-
-class Pyramid extends Mesh {
-constructor(){
-    super();
-    //PYRAMID
-    let vertices = [ 1, 0, 1 ,  1, 0, -1,  -1, 0, -1,  -1, 0, 1,  0, 1, 0 ];
-    let indices = [ 3, 2, 1,
-                    3, 1, 0,  
-                    3, 0, 4,  
-                    0, 1, 4,
-                    1, 2, 4,
-                    2, 3, 4];
-    this.geometry = new  THREE.BufferGeometry();
-    this.geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-    this.geometry.setIndex(indices);
-    this.material = new THREE.MeshBasicMaterial({color: "white", wireframe: false, side: THREE.DoubleSide});
-}
-}
-
-class Icosaedro extends Mesh {
-    constructor(){
-        super();
-        let vertices = [
-                        0,0,0, 
-                        -2, 0, 0,   
-                        -1, -1.73, 0, 
-                        -1, 1.29, 1.15, 
-                        -2.62, -1.51, 1.15, 
-                        0.62, -1.51, 1.15, 
-                        0.62, 0.36, 1.87, 
-                        -2.62, 0.36, 1.87, 
-                        -1, -2.45, 1.87, 
-                        -1, 0.58, 3.02, 
-                        -2, -1.15, 3.02, 
-                        0, -1.15, 3.02 
-                    ];
-        let indices = [ 0, 1, 2,
-                        0, 1, 3,
-                        0, 2, 5,
-                        0, 3, 6,
-                        0, 5, 6,
-                        1, 2, 4,
-                        1, 3, 7, 
-                        1, 4, 7,
-                        2, 4, 8,
-                        2, 5, 8,
-                        3, 6, 9,
-                        3, 7, 9,
-                        4, 7, 10, 
-                        4, 8, 10,
-                        5, 6, 11, 
-                        5, 8, 11,
-                        6, 9, 11,
-                        7, 9, 10,
-                        8, 10, 11,
-                        9, 10, 11
-        ];
-        this.geometry = new  THREE.BufferGeometry();
-        this.geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-        this.geometry.setIndex(indices);
-        this.material = new THREE.MeshBasicMaterial({color: "white", wireframe: false, side: THREE.DoubleSide});
-    }
-}
-
-class Octaedro extends Mesh {
-    constructor(){
-        super();
-        let vertices = [0, 0, 0,    
-                        1, 1, 1,    
-                        1, 1,-1,    
-                        -1, 1,-1,
-                        -1, 1, 1,    
-                        0,2,0,    
-                        ];
-        let indices = [ 0, 1, 2,
-                        0, 2, 3,    
-                        0, 3, 4,    
-                        0, 4, 1,
-                        5, 1, 2,
-                        5, 2, 3,    
-                        5, 3, 4,    
-                        5, 4, 1 
-        ];
-        this.geometry = new  THREE.BufferGeometry();
-        this.geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-        this.geometry.setIndex(indices);
-        this.material = new THREE.MeshBasicMaterial({color: "white", wireframe: false, side: THREE.DoubleSide});
-    }
-}
-
-class Estrella extends Mesh {
-    constructor(){
-        super();
-        let vertices = [0,1,0.63,   
-                        -2, 0,-2,    
-                        0, 0,-1.08,    
-                        2, 0, -2, 
-                        1.62, 0, 0.1,  
-                        3.24, 0, 1.8,    
-                        1, 0, 2,    
-                        0, 0, 4.16,  
-                        -1, 0, 2,  
-                        -3.24, 0, 1.8,  
-                        -1.62, 0, 0.1  
-                    ];
-        let indices = [
-                        1, 2, 0,
-                        1, 0, 10,
-                        3, 0, 2,
-                        3, 4, 0,
-                        5, 0, 4, 
-                        5, 6, 0,
-                        7, 0, 6,
-                        7, 8, 0,
-                        9, 0, 8,
-                        9, 10, 0
-
-        ];
-        this.geometry = new  THREE.BufferGeometry();
-        this.geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-        this.geometry.setIndex(indices);
-        this.material = new THREE.MeshBasicMaterial({color: "white", wireframe: false, side: THREE.DoubleSide});
-    }
-}
-
-class PiramideTriangular extends Mesh {
-constructor() {
-    super();
-    let vertices = [-2.04, 0, -1.18, 2.04, 0, -1.18, 0, 0, 2.35, 0, 4, 0];
-    let indices = [0, 1, 2, 0, 1, 3, 1, 2, 3, 2, 0, 3];
-    this.geometry = new THREE.BufferGeometry();
-    this.geometry.setAttribute(
-    "position",
-    new THREE.Float32BufferAttribute(vertices, 3)
-    );
-    this.geometry.setIndex(indices);
-    this.material = new THREE.MeshBasicMaterial({
-    color: "white",
-    wireframe: false,
-    side: THREE.DoubleSide,
-    });
-}
-}
-
-class PrismaTriangular extends Mesh {
-    constructor(){
-        super();
-        let vertices = [-2, 0, -1,   
-                        2, 0, -1,    
-                        0, 0, 2.46,  
-                        -2, 4, -1,   
-                        2, 4, -1,    
-                        0, 4, 2.46   
-                    ];
-        let indices = [
-                        0, 1, 2,
-                        1, 2, 4,
-                        2, 5, 4,
-                        2, 0, 5,
-                        0, 3, 5,
-                        0, 1, 3,
-                        1, 4, 3,
-                        3, 4, 5
-        ];
-        this.geometry = new  THREE.BufferGeometry();
-        this.geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-        this.geometry.setIndex(indices);
-        this.material = new THREE.MeshBasicMaterial({color: "white", wireframe: false, side: THREE.DoubleSide});
-    }
-}
-
-class PrismaRectangular extends Mesh {
-    constructor(){
-        super();
-        let vertices = [-1, 0, -1, 
-                        1, 0, -1, 
-                        1, 0, 1, 
-                        -1, 0, 1, 
-                        -1, 4, -1, 
-                        1, 4, -1, 
-                        1, 4, 1, 
-                        -1, 4, 1  
-                    ];
-        let indices = [
-                        0, 1, 2,
-                        0, 2, 3,
-                        0, 1, 4,
-                        1, 5, 4,
-                        1, 2, 5,
-                        2, 6, 5,
-                        2, 3, 6,
-                        3, 7, 6, 
-                        3, 0, 7, 
-                        0, 4, 7,
-                        7, 4, 6,
-                        6, 4, 5
-        ];
-        this.geometry = new  THREE.BufferGeometry();
-        this.geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-        this.geometry.setIndex(indices);
-        this.material = new THREE.MeshBasicMaterial({color: "white", wireframe: false, side: THREE.DoubleSide});
-    }
-}
-
-class PiramideOctagonal extends Mesh {
-    constructor(){
-        super();
-        let vertices = [-2.41, 0, 1,    
-                        0, 0, 2,    
-                        0, 0, 0,    
-                        -1.41, 0,-1.41,
-                        -3.41,0,-1.41,    
-                        -4.83, 0, 0,    
-                        -4.83, 0, 2,    
-                        -3.41,0, 3.41,
-                        -1.41, 0, 3.41,
-                        -2.41, 3, 1];
-        let indices = [
-                        0, 1, 2,
-                        0, 2, 3,    
-                        0, 3, 4,    
-                        0, 4, 5,
-                        0, 5, 6,    
-                        0, 6, 7,    
-                        0, 7, 8,
-                        0, 8, 1,
-                        9, 1, 2,
-                        9, 2, 3,    
-                        9, 3, 4,    
-                        9, 4, 5,
-                        9, 5, 6,    
-                        9, 6, 7,    
-                        9, 7, 8,
-                        9, 8, 1
-        ];
-        this.geometry = new  THREE.BufferGeometry();
-        this.geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-        this.geometry.setIndex(indices);
-        this.material = new THREE.MeshBasicMaterial({color: "white", wireframe: false, side: THREE.DoubleSide});
-    }
-}
-
-class PiramideHexagonal extends Mesh {
-    constructor(){
-        super();
-        let vertices = [0, 0, 0,    
-                        0, 0, 2,    
-                        1.73, 0, 1,    
-                        1.73, 0, -1,
-                        0, 0, -2,    
-                        -1.73, 0, -1,    
-                        -1.73, 0, 1,   
-                        0, 3, 0];
-        let indices = [
-                        0, 1, 2,
-                        0, 2, 3,    
-                        0, 3, 4,    
-                        0, 4, 5,
-                        0, 5, 6,    
-                        0, 6, 1,
-                        7, 1, 2,
-                        7, 2, 3,    
-                        7, 3, 4,    
-                        7, 4, 5,
-                        7, 5, 6,    
-                        7, 6, 1 ];
-        this.geometry = new  THREE.BufferGeometry();
-        this.geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-        this.geometry.setIndex(indices);
-        this.material = new THREE.MeshBasicMaterial({color: "white", wireframe: false, side: THREE.DoubleSide});
-    }
-}
-
-function init() {
-    // RENDERER
-    renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+    scene = new THREE.Scene();
+    renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // SCENE
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color("black");
+    /*
+    var groundBox = new THREE.BoxBufferGeometry(25, 1, 50);
+    var groundMesh = new THREE.MeshBasicMaterial({color : 0x00ff00});
+    var ground = new THREE.Mesh(groundBox, groundMesh);
+    scene.add(ground);
+    ground.position.y = -5;
 
-    // STATS
-    stats = new Stats();
-    stats.showPanel(0);
-    document.body.appendChild(stats.dom);
+    // Creating the border lines for ground
+    var edges = new THREE.EdgesGeometry(groundBox);
+    var line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({color : 0x000000}));
+    scene.add(line);
+    line.position.y = -5;
+    */
 
-    // PLANEHELPER
-    let normal = new THREE.Vector3(0, 1, 0);
-    let distanceToPlane = 0;
-    let plane = new THREE.Plane(normal, distanceToPlane);
-    let color = "grey";
-    let planeHelper = new THREE.PlaneHelper(plane, 20, color);
+    
+    camera.position.x = renderDistance * chunkSize / 2 * 5;
+    camera.position.z = renderDistance * chunkSize / 2 * 5;
+    camera.position.y = 50;
 
-    planeHelper.callback = () => {
-        console.log("plane");
-    };
+     //LIGHTS
 
-    scene.add(planeHelper);
+    //AmbientLight
+    let ambientLight = new THREE.AmbientLight();
 
-    // GRIDHELPER
-    let divisions = 10;
-    let colorCenterLine = "red";
-    let colorGrid = "grey";
-    let gridHelper = new THREE.GridHelper(
-        20,
-        divisions,
-        colorCenterLine,
-        colorGrid
-    );
+    //HemisphereLight
+    let skyColor = 0xB1E1FF;  // light blue
+    let groundColor = 0xB97A20;  // brownish orange
+    let intensity = 1;
+    let hemispherelight = new THREE.HemisphereLight(skyColor, groundColor, intensity);
 
-    gridHelper.callback = () => {
-        console.log("grid");
-    };
+    //DirectionalLight
+    let directionalLight = new THREE.DirectionalLight(0xFFFFFF, 2);
+    directionalLight.position.set(0,10,0);
+    directionalLight.target.position.set(0,5,0);
+    let directionalLightHelper = new THREE.DirectionalLightHelper(directionalLight);
+    directionalLight.castShadow = true;
+    
+    //PointLight
+    let pointLightColor = "white";
+    intensity = 1;
+    let distance = 0;
+    let decay = 1; 
+    let pointLight = new THREE.PointLight(pointLightColor, intensity, distance, decay);
+    pointLight.position.set(0, 3, 0);
+    let pointLightHelper = new THREE.PointLightHelper(pointLight, 0.1);
+    pointLight.castShadow = true;
+    
+    //RectAreaLight
+    let color = 0xFFFFFF;
+    intensity = 5;
+    let width = 12;
+    let height = 4;
+    let rectLight = new THREE.RectAreaLight(color, intensity, width, height);
+    rectLight.position.set(0, 10, 0);
+    rectLight.rotation.x = THREE.MathUtils.degToRad(-90);
+    //let rectAreaLightHelper = new RectAreaLightHelper(rectLight);
 
-    scene.add(gridHelper);
+    //SpotLight
+    color = 0xFFFFFF;
+    intensity = 1;
+    let spotLight = new THREE.SpotLight(color, intensity);
+    spotLight.position.set(0, 10, 0);
+    spotLight.target.position.set(-5, 0, 0);
+    let spotLightHelper = new THREE.SpotLightHelper(spotLight);
+    spotLight.castShadow = true;
 
-    //CAMERA
-    let fov = 60;
-    let aspect = window.innerWidth / window.innerHeight;
-    let near = 0.1;
-    let far = 10000;
-    camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
-    camera.position.set(0, 0, 3);
-    cameraControl = new OrbitControls(camera, renderer.domElement);
+    var loader = new THREE.TextureLoader();
+    materialArray = [
+        new THREE.MeshStandardMaterial({map : loader.load("texture/side4.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/side1.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/top.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/bottom.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/side2.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/side3.jpg")}),
+    ];
 
-    // MODELS
-    //let geometry = new THREE.BoxGeometry();
-    //let material = new THREE.MeshBasicMaterial({ wireframe: false });
-    //mesh = new THREE.Mesh(geometry, material);
-    //mesh.name = "Mesh Name";
-    let cube = new Cube();
-    cube.material.wireframe = true;
-    scene.add(cube);
-    mesh = cube;
+    dirtMaterialArray = [
+        new THREE.MeshStandardMaterial({map : loader.load("texture/bottom.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/bottom.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/bottom.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/bottom.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/bottom.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/bottom.jpg")}),
+    ];
 
-    // GUI
+    woodMaterialArray = [
+        new THREE.MeshStandardMaterial({map : loader.load("texture/wood.png")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/wood.png")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/wood.png")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/wood.png")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/wood.png")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/wood.png")}),
+    ];
+
+    stoneMaterialArray = [
+        new THREE.MeshStandardMaterial({map : loader.load("texture/stone.png")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/stone.png")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/stone.png")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/stone.png")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/stone.png")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/stone.png")}),
+    ];
+
+    metalMaterialArray = [
+        new THREE.MeshStandardMaterial({map : loader.load("texture/metal.png"), metalness: 1.0, roughness: 0.5}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/metal.png"), metalness: 1.0, roughness: 0.5}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/metal.png"), metalness: 1.0, roughness: 0.5}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/metal.png"), metalness: 1.0, roughness: 0.5}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/metal.png"), metalness: 1.0, roughness: 0.5}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/metal.png"), metalness: 1.0, roughness: 0.5}),
+    ];
+
+    //material gui 
     let gui = new dat.GUI();
 
-    let mainGui = new dat.GUI();
+    let listSkys = ["None", "Blue Clouds", "Blue", "Yellow", "Gray", "Brown", "Interestelar", "Red Dark", "Blue Dark", "Blue Light", "Nebulas", "Space", "Tron"];
 
-    let meshGui = mainGui.addFolder("General Menu");
-
-    //model
     model = {
-        name: mesh.name,
-        wireframe: mesh.material.wireframe,
-        posX: mesh.position.x,
-        posY: mesh.position.y,
-        posZ: mesh.position.z,
-        rotX: (mesh.rotation.x * 180) / Math.PI,
-        rotY: (mesh.rotation.y * 180) / Math.PI,
-        rotZ: (mesh.rotation.z * 180) / Math.PI,
-        posHome: function () {
-        model.posX = 0;
-        mesh.position.x = model.posX;
-        model.posY = 0;
-        mesh.position.y = model.posY;
-        model.posZ = 0;
-        mesh.position.z = model.posZ;
-        },
-        listColors,
-        defaultItem: listColors[0],
-        colorPalette: [255, 255, 255],
-    };
+        selectedMaterial: materialArray,
+        materialList: ["grass", "dirt", "wood", "stone", "metal"],
+        listSkys,
+        defaultSky: listSkys[0],
+        colorPalette: [0, 0, 0],
+        ambientColor: [0, 0, 0],
+        directionalColor: [0, 0, 0],
+        pointColor: [0, 0, 0],
+        rectColor: [0, 0, 0],
+        spotColor: [0, 0, 0],
+    }
 
-    let meshModel = {
-        spawnQuad: () => {
-            let quad = new Quad();
-            quad.material.wireframe = true;
-            scene.add(quad);
-            mesh = quad;
-            mesh.callback();
-        },
-        spawnCube: () => {
-            let cube = new Cube();
-            cube.material.wireframe = true;
-            scene.add(cube);
-            mesh = cube;
-            mesh.callback();
-        },
-        spawnPyramid: () => {
-            let pyramid = new Pyramid();
-            pyramid.material.wireframe = true;
-            scene.add(pyramid);
-            mesh = pyramid;
-            mesh.callback();
-        },
-        spawnIcosaedro: () => {
-            let icosaedro = new Icosaedro();
-            icosaedro.material.wireframe = true;
-            scene.add(icosaedro);
-            mesh = icosaedro;
-            mesh.callback();
-        },
-        spawnOctaedro: () => {
-            let octaedro = new Octaedro();
-            octaedro.material.wireframe = true;
-            scene.add(octaedro);
-            mesh = octaedro;
-            mesh.callback();
-        },
-        spawnEstrella: () => {
-            let estrella = new Estrella();
-            estrella.material.wireframe = true;
-            scene.add(estrella);
-            mesh = estrella;
-            mesh.callback();
-        },
-        spawnPiramideTriangular: () => {
-            let piramideTriangular = new PiramideTriangular();
-            piramideTriangular.material.wireframe = true;
-            scene.add(piramideTriangular);
-            mesh = piramideTriangular;
-            mesh.callback();
-        },
-        spawnPrismaTriangular: () => {
-            let prismaTriangular = new PrismaTriangular();
-            prismaTriangular.material.wireframe = true;
-            scene.add(prismaTriangular);
-            mesh = prismaTriangular;
-            mesh.callback();
-        },
-        spawnPrismaRectangular: () => {
-            let prismaRectangular = new PrismaRectangular();
-            prismaRectangular.material.wireframe = true;
-            scene.add(prismaRectangular);
-            mesh = prismaRectangular;
-            mesh.callback();
-        },
-        spawnPiramideOctagonal: () => {
-            let piramideOctagonal = new PiramideOctagonal();
-            piramideOctagonal.material.wireframe = true;
-            scene.add(piramideOctagonal);
-            mesh = piramideOctagonal;
-            mesh.callback();
-        },
-        spawnPiramideHexagonal: () => {
-            let piramideHexagonal = new PiramideHexagonal();
-            piramideHexagonal.material.wireframe = true;
-            scene.add(piramideHexagonal);
-            mesh = piramideHexagonal;
-            mesh.callback();
-        },
-        backgroundColor: listColors[1],
-        stats: true,
-    };
+    //General Menu
+    let generalMenu = gui.addFolder("General Menu Anem");
+    generalMenu.open();
 
-    let btnQuad = meshGui.add(meshModel, "spawnQuad").name("Quad");
-    let btnCube = meshGui.add(meshModel, "spawnCube").name("Cube");
-    let btnPyramid = meshGui.add(meshModel, "spawnPyramid").name("Pyramid");
-    let btnIcosaedro = meshGui.add(meshModel, "spawnIcosaedro").name("Icosaedro");
-    let btnOctaedro = meshGui.add(meshModel, "spawnOctaedro").name("Octaedro");
-    let btnEstrella = meshGui.add(meshModel, "spawnEstrella").name("Estrella");
-    let btnPiramideTriangular = meshGui.add(meshModel, "spawnPiramideTriangular").name("PiramideTriangular");
-    let btnPrismaTriangular = meshGui.add(meshModel, "spawnPrismaTriangular").name("PrismaTriangular");
-    let btnPrismaRectangular = meshGui.add(meshModel, "spawnPrismaRectangular").name("PrismaRectangular");
-    let btnPiramideOctagonal = meshGui.add(meshModel, "spawnPiramideOctagonal").name("PiramideOctagonal");
-    let btnPiramideHexagonal = meshGui.add(meshModel, "spawnPiramideHexagonal").name("PiramideHexagonal");
+    //Lights Menu
+    let skyMenu = gui.addFolder("Sky Box Appereance");
 
-    let backgroundMenu = mainGui.addFolder("Background Menu");
+    //Sky Box Appereance Menu
+    let lightsMenu = gui.addFolder("Lights");
+    lightsMenu.open();
+    let ambientLightMenu = lightsMenu.addFolder("Ambient Light");
+    let hemisLightMenu = lightsMenu.addFolder("Hemisphere Light");
+    let direcLightMenu = lightsMenu.addFolder("Directional Light");
+    let pointLightMenu = lightsMenu.addFolder("Point Light");
+    let rectLightMenu = lightsMenu.addFolder("Rect Area Light");
+    let spotLightMenu = lightsMenu.addFolder("Spot Light");
 
-    let backgroundColor = backgroundMenu.add(meshModel, "backgroundColor", model.listColors).name("Background Color").listen().onChange((item) => {
-        meshModel.backgroundColor = item;
-        scene.background = new THREE.Color(item.toLowerCase());
-    });
+    //Plane Appereance Menu
+    let planeMenu = gui.addFolder("Plane");
 
-    // General Menu
-    let generalMenu = gui.addFolder("Mesh Menu");
-
-    let tfMeshName = generalMenu.add(model, "name").name("Model's Name").onChange().listen().onFinishChange((value) => {}).onFinishChange((value) => {
-        mesh.name = value;
-    });
-
-    let chbPlaneHelper = backgroundMenu.add(planeHelper, "visible").setValue(false).name("PlaneHelper");
-    let chbGridHelper = backgroundMenu.add(gridHelper, "visible").setValue(false).name("GridHelper");
-
-    let chbStats = backgroundMenu.add(meshModel, "stats").name("Stats").onChange((value) => {
-        if (value) {
-            stats.showPanel(0);
-        } else {
-            stats.showPanel(3);
+    let listMaterial = gui.add(model, 'selectedMaterial', model.materialList).name("Material List").listen().onChange((item) => {
+        switch(item){
+            case 'grass':
+                model.selectedMaterial = materialArray; 
+                break;
+            case 'dirt':
+                model.selectedMaterial = dirtMaterialArray; 
+                break;
+            case 'wood':
+                model.selectedMaterial = woodMaterialArray; 
+                break;
+            case 'stone':
+                model.selectedMaterial = stoneMaterialArray; 
+                break;
+            case 'metal':
+                model.selectedMaterial = metalMaterialArray; 
+                break;
+            default:
+                model.selectedMaterial = materialArray; 
         }
     });
 
-    //VIEW
-    // Position Menu
-    let posMenu = gui.addFolder("Model's Position Menu");
-    //posMenu.open();
-    // Model Position
-    let sliderPosX = posMenu.add(model, "posX").min(-10).max(10).step(0.5).name("X").listen().onChange((value) => {
-        mesh.position.x = value;
+    scene.add(ambientLight);
+    scene.add(hemispherelight);
+    scene.add(directionalLight);
+    scene.add(directionalLight.target);
+    scene.add(directionalLightHelper);
+    scene.add(pointLight);
+    scene.add(pointLightHelper);
+    scene.add(rectLight);
+    //scene.add(rectAreaLightHelper);
+    scene.add(spotLight);
+    scene.add(spotLight.target);
+    scene.add(spotLightHelper);
+
+     //LIGHTS
+
+    //Ambient Light
+    ambientLightMenu.add(ambientLight, "visible").name("Ambient Light").setValue(false).listen().onChange(function(value) { });
+    ambientLightMenu.add(ambientLight, "intensity").min(0).max(2).step(0.1).name("Intensidad").listen().onChange(function(value){ });
+    ambientLightMenu.addColor(model, "ambientColor").name("Ambient Color").listen().onChange(function(color){
+        ambientLight.color = new THREE.Color(color[0]/256, color[1]/256, color[2]/256);
+    });
+    
+    //Hemisphere Light
+    class ColorHelper {
+        constructor(object, prop) {
+          this.object = object;
+          this.prop = prop;
+        }
+        get value() {
+          return `#${this.object[this.prop].getHexString()}`;
+        }
+        set value(hexString) {
+          this.object[this.prop].set(hexString);
+        }
+    }
+    hemisLightMenu.add(hemispherelight, "visible").name("Hemisphere Light").setValue(false).listen().onChange(function(value) { });
+    hemisLightMenu.addColor(new ColorHelper(hemispherelight, 'color'), 'value').name('skyColor');
+    hemisLightMenu.addColor(new ColorHelper(hemispherelight, 'groundColor'), 'value').name('groundColor');
+    hemisLightMenu.add(hemispherelight, 'intensity', 0, 2, 0.01);
+
+    //Directional Light
+    function makeXYZGUI(gui, vector3, name, onChangeFn) {
+        let folder = gui.addFolder(name);
+        folder.add(vector3, 'x', -30, 30).onChange(onChangeFn);
+        folder.add(vector3, 'y', 0, 30).onChange(onChangeFn);
+        folder.add(vector3, 'z', -30, 30).onChange(onChangeFn);
+        folder.open();
+    }
+    function updateLight() {
+        directionalLight.target.updateMatrixWorld();
+        directionalLightHelper.update();
+    }
+    updateLight();
+    direcLightMenu.add(directionalLight, "visible").name("Directional Light").setValue(false).listen().onChange(function(value) { });
+    direcLightMenu.add(directionalLightHelper, "visible").name("Helper").setValue(false).listen().onChange(function(value) { });
+    direcLightMenu.add(directionalLight, "intensity").min(0).max(10).step(0.1).name("Intensidad").listen().onChange(function(value){ });
+    makeXYZGUI(direcLightMenu, directionalLight.position, 'position', updateLight);
+    makeXYZGUI(direcLightMenu, directionalLight.target.position, 'target', updateLight);
+    direcLightMenu.addColor(model, "directionalColor").name("Directional Color").listen().onChange(function(color){
+        directionalLight.color = new THREE.Color(color[0]/256, color[1]/256, color[2]/256);
     });
 
-    let sliderPosY = posMenu.add(model, "posY").min(-10).max(10).step(0.5).name("Y").listen().onChange((value) => {
-        mesh.position.y = value;
+    //Point Light
+    pointLightMenu.add(pointLight, "visible").name("Point Light").setValue(false).listen().onChange(function(value) { });
+    pointLightMenu.add(pointLightHelper, "visible").name("Helper").setValue(false).listen().onChange(function(value) { });
+    pointLightMenu.add(pointLight, "intensity").min(0).max(10).step(0.1).name("Intensidad").listen().onChange(function(value){ });
+    pointLightMenu.add(pointLight, "decay").min(0).max(4).step(0.1).name("Decay").listen().onChange(function(value){ });
+    pointLightMenu.add(pointLight, "power").min(0).max(1220).step(0.1).name("Power").listen().onChange(function(value){ });
+    pointLightMenu.add(pointLight, "distance").min(0).max(20).step(0.1).name("Distance").listen().onChange(function(value){ });
+    pointLightMenu.add(pointLight.position, "x").min(-10).max(10).step(0.1).setValue(0).name("Point Light X").listen().onChange(function(value){ });
+    pointLightMenu.add(pointLight.position, "y").min(-10).max(10).step(0.1).setValue(2).name("Point Light Y").listen().onChange(function(value){ });
+    pointLightMenu.add(pointLight.position, "z").min(-10).max(10).step(0.1).setValue(0).name("Point Light Z").listen().onChange(function(value){ });
+    pointLightMenu.addColor(model, "pointColor").name("Point Color").listen().onChange(function(color){
+        pointLight.color = new THREE.Color(color[0]/256, color[1]/256, color[2]/256);
+        pointLightHelper = new THREE.PointLightHelper(pointLight, 0.1);
     });
 
-    let sliderPosZ = posMenu.add(model, "posZ").min(-10).max(10).step(0.5).name("Z").listen().onChange((value) => {
-        mesh.position.z = value;
+    //RectAreaLight
+    class DegRadHelper {
+        constructor(obj, prop) {
+          this.obj = obj;
+          this.prop = prop;
+        }
+        get value() {
+          return THREE.MathUtils.radToDeg(this.obj[this.prop]);
+        }
+        set value(v) {
+          this.obj[this.prop] = THREE.MathUtils.degToRad(v);
+        }
+    }
+    rectLightMenu.add(rectLight, "visible").name("Rect Area Light").setValue(false).listen().onChange(function(value) { });
+    //rectLightMenu.add(rectAreaLightHelper, "visible").name("Helper").setValue(false).listen().onChange(function(value) { });
+    rectLightMenu.add(rectLight, "intensity").min(0).max(10).step(0.1).name("Intensidad").listen().onChange(function(value){ });
+    rectLightMenu.add(rectLight, 'width', 0, 20);
+    rectLightMenu.add(rectLight, 'height', 0, 20);
+
+    rectLightMenu.add(new DegRadHelper(rectLight.rotation, 'x'), 'value', -180, 180).name('x rotation');
+    rectLightMenu.add(new DegRadHelper(rectLight.rotation, 'y'), 'value', -180, 180).name('y rotation');
+    rectLightMenu.add(new DegRadHelper(rectLight.rotation, 'z'), 'value', -180, 180).name('z rotation');
+
+
+    rectLightMenu.add(rectLight.position, "x").min(-10).max(10).step(0.1).setValue(0).name("Point Light X").listen().onChange(function(value){ });
+    rectLightMenu.add(rectLight.position, "y").min(-10).max(10).step(0.1).setValue(2).name("Point Light Y").listen().onChange(function(value){ });
+    rectLightMenu.add(rectLight.position, "z").min(-10).max(10).step(0.1).setValue(0).name("Point Light Z").listen().onChange(function(value){ });
+    rectLightMenu.addColor(model, "rectColor").name("Rect Color").listen().onChange(function(color){
+        rectLight.color = new THREE.Color(color[0]/256, color[1]/256, color[2]/256);
     });
 
-    let btnPosHome = posMenu.add(model, "posHome").name("HOME");
+    //Spot light
+    spotLightMenu.add(spotLight, "visible").name("Point Light").setValue(false).listen().onChange(function(value) {
 
-    // Rotation Menu
-    let rotMenu = gui.addFolder("Model's Rotation Menu");
+    });
+    spotLightMenu.add(spotLightHelper, "visible").name("Helper").setValue(false).listen().onChange(function(value) {
 
-    // Model Orientation
-    let sliderRotX = rotMenu.add(model, "rotX").min(-180).max(180).step(5).name("X (deg)").listen().onChange((value) => {
-        mesh.rotation.x = (value * Math.PI) / 180;
+    });
+    function updateSpotLight() {
+        spotLight.target.updateMatrixWorld();
+        spotLightHelper.update();
+    }
+    updateSpotLight();
+    spotLightMenu.add(spotLight, 'intensity', 0, 2, 0.01);
+    spotLightMenu.add(spotLight, 'distance', 0, 40).onChange(updateSpotLight);
+    spotLightMenu.add(new DegRadHelper(spotLight, 'angle'), 'value', 0, 90).name('angle').onChange(updateSpotLight);
+    spotLightMenu.add(spotLight, 'penumbra', 0, 1, 0.01);
+
+    makeXYZGUI(spotLightMenu, spotLight.position, 'position', updateSpotLight);
+    makeXYZGUI(spotLightMenu, spotLight.target.position, 'target', updateSpotLight);
+
+    spotLightMenu.addColor(model, "spotColor").name("Spot Color").listen().onChange(function(color){
+        spotLight.color = new THREE.Color(color[0]/256, color[1]/256, color[2]/256);
     });
 
-    let sliderRotY = rotMenu.add(model, "rotY").min(-180).max(180).step(5).name("Y (deg)").listen()
-        .onChange((value) => {
-        mesh.rotation.y = (value * Math.PI) / 180;
-        });
+    function skyChange(texture1, texture2, texture3, texture4, texture5, texture6) {
 
-    let sliderRotZ = rotMenu.add(model, "rotZ").min(-180).max(180).step(5).name("Z (deg)").listen().onChange((value) => {
-        mesh.rotation.z = (value * Math.PI) / 180;
+        scene.remove(skybox);
+
+        // MODELS
+        geometry = new THREE.BoxGeometry(1000, 1000, 1000);
+
+        let cubeMaterials = [
+            new THREE.MeshBasicMaterial({map:texture1, side: THREE.DoubleSide}),
+            new THREE.MeshBasicMaterial({map:texture2, side: THREE.DoubleSide}),
+            new THREE.MeshBasicMaterial({map:texture3, side: THREE.DoubleSide}),
+            new THREE.MeshBasicMaterial({map:texture4, side: THREE.DoubleSide}),
+            new THREE.MeshBasicMaterial({map:texture5, side: THREE.DoubleSide}),
+            new THREE.MeshBasicMaterial({map:texture6, side: THREE.DoubleSide})
+        ]
+        // MESH
+        skybox = new THREE.Mesh(geometry, cubeMaterials);
+
+        // SCENE HIERARCHY
+        scene.add(skybox);
+    }
+
+    let colorPalette = skyMenu.addColor(model, "colorPalette").name("Sky Color Palette").listen().onChange(function(color){
+        scene.background = new THREE.Color(color[0]/256, color[1]/256, color[2]/256);
     });
 
-    let appearMenu = gui.addFolder("Model's Appearance Menu");
+    let listSky = skyMenu.add(model, "defaultSky", model.listSkys).name("Sky list options").listen().onChange(function(item){
+        console.log(item);
+        if(item=="None"){
+            scene.remove(skybox);
+        }else if (item=="Blue Clouds"){
+            texture1 = new THREE.TextureLoader().load('./../texture/clouds1_east.bmp');
+            texture2 = new THREE.TextureLoader().load('./../texture/clouds1_west.bmp');
+            texture3 = new THREE.TextureLoader().load('./../texture/clouds1_up.bmp');
+            texture4 = new THREE.TextureLoader().load('./../texture/clouds1_down.bmp');
+            texture5 = new THREE.TextureLoader().load('./../texture/clouds1_north.bmp');
+            texture6 = new THREE.TextureLoader().load('./../texture/clouds1_south.bmp');
+            
+            skyChange(texture1, texture2, texture3, texture4, texture5, texture6);
+        }else if(item=="Blue"){
+            texture1 = new THREE.TextureLoader().load('./../texture/bluecloud_ft.jpg');
+            texture2 = new THREE.TextureLoader().load('./../texture/bluecloud_bk.jpg');
+            texture3 = new THREE.TextureLoader().load('./../texture/bluecloud_up.jpg');
+            texture4 = new THREE.TextureLoader().load('./../texture/bluecloud_dn.jpg');
+            texture5 = new THREE.TextureLoader().load('./../texture/bluecloud_rt.jpg');
+            texture6 = new THREE.TextureLoader().load('./../texture/bluecloud_lf.jpg');
 
-    // Model Draw Mode
-    let chbWireframe = appearMenu.add(model, "wireframe").setValue(true).name("Wireframe").listen().onChange((value) => {
-        mesh.material.wireframe = value;
+            skyChange(texture1, texture2, texture3, texture4, texture5, texture6);
+        }else if(item=="Yellow"){
+            texture1 = new THREE.TextureLoader().load('./../texture/yellowcloud_ft.jpg');
+            texture2 = new THREE.TextureLoader().load('./../texture/yellowcloud_bk.jpg');
+            texture3 = new THREE.TextureLoader().load('./../texture/yellowcloud_up.jpg');
+            texture4 = new THREE.TextureLoader().load('./../texture/yellowcloud_dn.jpg');
+            texture5 = new THREE.TextureLoader().load('./../texture/yellowcloud_rt.jpg');
+            texture6 = new THREE.TextureLoader().load('./../texture/yellowcloud_lf.jpg');
+
+            skyChange(texture1, texture2, texture3, texture4, texture5, texture6);
+        }else if(item=="Gray"){
+            texture1 = new THREE.TextureLoader().load('./../texture/graycloud_ft.jpg');
+            texture2 = new THREE.TextureLoader().load('./../texture/graycloud_bk.jpg');
+            texture3 = new THREE.TextureLoader().load('./../texture/graycloud_up.jpg');
+            texture4 = new THREE.TextureLoader().load('./../texture/graycloud_dn.jpg');
+            texture5 = new THREE.TextureLoader().load('./../texture/graycloud_rt.jpg');
+            texture6 = new THREE.TextureLoader().load('./../texture/graycloud_lf.jpg');
+
+            skyChange(texture1, texture2, texture3, texture4, texture5, texture6);
+        }else if(item=="Brown"){
+            texture1 = new THREE.TextureLoader().load('./../texture/browncloud_ft.jpg');
+            texture2 = new THREE.TextureLoader().load('./../texture/browncloud_bk.jpg');
+            texture3 = new THREE.TextureLoader().load('./../texture/browncloud_up.jpg');
+            texture4 = new THREE.TextureLoader().load('./../texture/browncloud_dn.jpg');
+            texture5 = new THREE.TextureLoader().load('./../texture/browncloud_rt.jpg');
+            texture6 = new THREE.TextureLoader().load('./../texture/browncloud_lf.jpg');
+
+            skyChange(texture1, texture2, texture3, texture4, texture5, texture6);
+        }else if (item=="Red Dark"){
+
+            texture1 = new THREE.TextureLoader().load('./../texture/bkg1_rt.png');
+            texture2 = new THREE.TextureLoader().load('./../texture/bkg1_lf.png');
+            texture3 = new THREE.TextureLoader().load('./../texture/bkg1_up.png');
+            texture4 = new THREE.TextureLoader().load('./../texture/bkg1_dn.png');
+            texture5 = new THREE.TextureLoader().load('./../texture/bkg1_ft.png');
+            texture6 = new THREE.TextureLoader().load('./../texture/bkg1_bk.png');
+
+            skyChange(texture1, texture2, texture3, texture4, texture5, texture6);
+        }else if (item=="Blue Dark"){
+
+            texture1 = new THREE.TextureLoader().load('./../texture/bkg2_rt.png');
+            texture2 = new THREE.TextureLoader().load('./../texture/bkg2_lf.png');
+            texture3 = new THREE.TextureLoader().load('./../texture/bkg2_up.png');
+            texture4 = new THREE.TextureLoader().load('./../texture/bkg2_dn.png');
+            texture5 = new THREE.TextureLoader().load('./../texture/bkg2_ft.png');
+            texture6 = new THREE.TextureLoader().load('./../texture/bkg2_bk.png');
+
+            skyChange(texture1, texture2, texture3, texture4, texture5, texture6);
+        }else if (item=="Blue Light"){
+
+            texture1 = new THREE.TextureLoader().load('./../texture/bkg_rt.png');
+            texture2 = new THREE.TextureLoader().load('./../texture/bkg_lf.png');
+            texture3 = new THREE.TextureLoader().load('./../texture/bkg_up.png');
+            texture4 = new THREE.TextureLoader().load('./../texture/bkg_dn.png');
+            texture5 = new THREE.TextureLoader().load('./../texture/bkg_ft.png');
+            texture6 = new THREE.TextureLoader().load('./../texture/bkg_bk.png');
+
+            skyChange(texture1, texture2, texture3, texture4, texture5, texture6);
+        }else if (item=="Interestelar"){
+
+            texture1 = new THREE.TextureLoader().load('./../texture/interstellar_ft.png');
+            texture2 = new THREE.TextureLoader().load('./../texture/interstellar_bk.png');
+            texture3 = new THREE.TextureLoader().load('./../texture/interstellar_up.png');
+            texture4 = new THREE.TextureLoader().load('./../texture/interstellar_dn.png');
+            texture5 = new THREE.TextureLoader().load('./../texture/interstellar_rt.png');
+            texture6 = new THREE.TextureLoader().load('./../texture/interstellar_lf.png');
+
+            skyChange(texture1, texture2, texture3, texture4, texture5, texture6);
+        }else if (item=="Nebulas"){
+            texture1 = new THREE.TextureLoader().load('./../texture/nebulas_lf.png');
+            texture2 = new THREE.TextureLoader().load('./../texture/nebulas_rt.png');
+            texture3 = new THREE.TextureLoader().load('./../texture/nebulas_up.png');
+            texture4 = new THREE.TextureLoader().load('./../texture/nebulas_dn.png');
+            texture5 = new THREE.TextureLoader().load('./../texture/nebulas_ft.png');
+            texture6 = new THREE.TextureLoader().load('./../texture/nebulas_bk.png');
+
+            skyChange(texture1, texture2, texture3, texture4, texture5, texture6);
+        }else if (item=="Space"){
+            texture1 = new THREE.TextureLoader().load('./../texture/space_ft.png');
+            texture2 = new THREE.TextureLoader().load('./../texture/space_bk.png');
+            texture3 = new THREE.TextureLoader().load('./../texture/space_up.png');
+            texture4 = new THREE.TextureLoader().load('./../texture/space_dn.png');
+            texture5 = new THREE.TextureLoader().load('./../texture/space_rt.png');
+            texture6 = new THREE.TextureLoader().load('./../texture/space_lf.png');
+
+            skyChange(texture1, texture2, texture3, texture4, texture5, texture6);
+        }else if (item=="Tron"){
+            texture1 = new THREE.TextureLoader().load('./../texture/tron_ft.png');
+            texture2 = new THREE.TextureLoader().load('./../texture/tron_bk.png');
+            texture3 = new THREE.TextureLoader().load('./../texture/tron_up.png');
+            texture4 = new THREE.TextureLoader().load('./../texture/tron_dn.png');
+            texture5 = new THREE.TextureLoader().load('./../texture/tron_rt.png');
+            texture6 = new THREE.TextureLoader().load('./../texture/tron_lf.png');
+
+            skyChange(texture1, texture2, texture3, texture4, texture5, texture6);
+        }
     });
 
-    let listColor = appearMenu.add(model, "defaultItem", model.listColors).name("Color List").listen().onChange((item) => {
-        mesh.material.color = new THREE.Color(item.toLowerCase());
-        model.colorPalette = [
-            mesh.material.color.r * 255,
-            mesh.material.color.g * 255,
-            mesh.material.color.b * 255,
-        ];
+
+    blockBox = new THREE.BoxGeometry(5, 5, 5)
+    var count = 0;
+    for(var i = 0; i < renderDistance; i++){
+        for(j = 0; j < renderDistance; j++){
+            var chunk = [];
+            for(var x = i * chunkSize; x < (i * chunkSize) + chunkSize; x++){
+                for(var z = j * chunkSize; z < (j * chunkSize) + chunkSize; z++){
+                    var v = 0;
+                    chunk.push(new Block(x * 5, v, z * 5, materialArray, false));
+                    let matrix = new THREE.Matrix4().makeTranslation(
+                        x * 5,
+                        v,
+                        z * 5
+                    );
+                    instancedChunk[count] = new THREE.Mesh(blockBox, materialArray);
+                    instancedChunk[count].position.set(x * 5 ,v,z * 5);
+                    count++;
+                }
+            }
+            chunks.push(chunk);
+        }
+    }
+
+    instancedChunk.forEach(element => {
+        scene.add(element);
     });
 
-    let listPalette = appearMenu.addColor(model, "colorPalette").name("Color Palette").listen().onChange((color) => {
-        mesh.material.color = new THREE.Color(
-            color[0] / 255,
-            color[1] / 255,
-            color[2] / 255
-        );
-    });
+    for(var x = 0; x < renderDistance; x++){
+        for(var z = 0; z < renderDistance; z++){
+            chunkMap.push({x : x, z : z});
+        }
+    }
 
-    appearMenu.add(mesh.material, "transparent");
-    appearMenu.add(mesh.material, "opacity", 0, 1, 0.01);
 
-    //gui.close();
+    start = 0;
+    sprint = false; 
 
-    raycaster = new THREE.Raycaster();
-    mouse = new THREE.Vector2();
+    stats = new Stats();
+    stats.showPanel(0); // 0:fps, 1:ms, 2:mb, 3+:custom
+    document.body.appendChild(stats.dom);
 
     // RENDER LOOP
     renderLoop();
 }
 
-function renderLoop() {
-    // DRAW SCENE
-    stats.begin();
-    renderer.render(scene, camera);
-    updateScene();
-    stats.end();
-    stats.update();
-    requestAnimationFrame(renderLoop);
+function identifyChunk(x, z){
+    var lowestX = lowestXBlock();
+    var lowestZ = lowestZBlock();
+    var difX = x - lowestX;
+    var difZ = z - lowestZ;
+    var divX = Math.floor(difX / (chunkSize * 5));
+    var divZ = Math.floor(difZ / (chunkSize * 5));
+    var index = undefined;
+    for(var i = 0; i < chunkMap.length; i++){
+        if(chunkMap[i].x == divX && chunkMap[i].z == divZ){
+            index = i;
+            break;
+        }
+    }
+    return index; // Identified the chunks!!!
 }
 
-function updateScene() {
+
+document.addEventListener("keydown", function(e){
+    if(e.key == "w") {
+        var elapsed = new Date().getTime();
+        if(elapsed - start <= 300){
+            sprint = true;
+        }
+        start = elapsed;
+    }
+
+    keys.push(e.key);
+
+    if(e.key == controlOptions.jump && canJump == true){
+        ySpeed = -1;
+        canJump = false;
+    }
+    if(e.key == controlOptions.placeBlock){
+        const raycaster = new THREE.Raycaster();
+        const pointer = new THREE.Vector2();
+        pointer.x = (0.5) * 2 - 1;
+        pointer.y = -1 * (0.5) * 2 + 1;
+        raycaster.setFromCamera(pointer, camera);
+        var intersection = raycaster.intersectObjects(instancedChunk, true);
+
+        if(intersection[0] != undefined && intersection[0].distance < 40){
+            console.log(intersection[0]);
+            var materialIndex = intersection[0].face.materialIndex;
+            var position = intersection[0].point; // object with x, y and z coords
+            var x = 0;
+            var y = 0;
+            var z = 0;
+            const inc = 2.5; 
+            switch(materialIndex){
+                case 0: // right
+                    x = position.x + inc;
+                    y = Math.round(position.y / 5) * 5;
+                    z = Math.round(position.z / 5) * 5;
+                    break;
+                case 1: // left
+                    x = position.x - inc;
+                    y = Math.round(position.y / 5) * 5;
+                    z = Math.round(position.z / 5) * 5;
+                    break;
+                case 2: // top
+                    x = Math.round(position.x / 5) * 5;
+                    y = position.y + inc;
+                    z = Math.round(position.z / 5) * 5;
+                    break;
+                case 3: // bottom
+                    x = Math.round(position.x / 5) * 5;
+                    y = position.y - inc;
+                    z = Math.round(position.z / 5) * 5;
+                    break;
+                case 4: // front
+                    x = Math.round(position.x / 5) * 5;
+                    y = Math.round(position.y / 5) * 5;
+                    z = position.z + inc;
+                    break;
+                case 5: // back
+                    x = Math.round(position.x / 5) * 5;
+                    y = Math.round(position.y / 5) * 5;
+                    z = position.z - inc;
+                    break;
+            }
+            y = Math.round(y); // sometimes, y is for some reason e.g 4.999999999999
+            var b = {x : x, y : y, z : z};
+            if(!intersect(b.x, b.y, b.z, 5, 5, 5, player.x, player.y, player.z, player.w, player.h, player.d)){
+                chunks[identifyChunk(x, z)].push(new Block(x, y, z, model.selectedMaterial, true));
+                placedBlocks.push(b);
+
+                /*
+                instancedChunk.forEach(element => {
+                    scene.remove(element);
+                });
+                scene.remove(instancedChunk);
+                */
+
+                let addedBlock = new  THREE.Mesh(blockBox, model.selectedMaterial);
+                addedBlock.position.set(x, y, z);
+                instancedChunk.push(addedBlock);
+                scene.add(instancedChunk[instancedChunk.length -1]);
+                /*
+                //instancedChunk = new THREE.InstancedMesh(blockBox, materialArray, (renderDistance * renderDistance * chunkSize * chunkSize) + placedBlocks.length);
+                instancedChunk = []
+                var count = 0;
+                for(var i = 0; i < chunks.length; i++){
+                    for(var j = 0; j < chunks[i].length; j++){
+                        let matrix = new THREE.Matrix4().makeTranslation(
+                            chunks[i][j].x,
+                            chunks[i][j].y,
+                            chunks[i][j].z
+                        );
+                        instancedChunk[count] = new THREE.Mesh(blockBox, materialArray);
+                        instancedChunk[count].position.set(chunks[i][j].x, chunks[i][j].y, chunks[i][j].z);
+                        count++;
+                    }
+                }
+                
+                */
+            }		
+        }
+    }
+});
+document.addEventListener("keyup", function(e){
+    var newArr = [];
+    for(var i = 0; i < keys.length; i++){
+        if(keys[i] != e.key){
+            newArr.push(keys[i]);
+        }
+    }
+    keys = newArr;
+    if(!keys.includes("w")){
+        sprint = false;
+    }
+});
+
+var controls = new THREE.PointerLockControls(camera, document.body);
+var brokenBlocks = [];
+
+document.body.addEventListener("click", function(){
+    controls.lock();
+    // Breaking blocks
+    if(controls.isLocked){
+        // Shooting a ray
+        const raycaster = new THREE.Raycaster();
+        const pointer = new THREE.Vector2();
+        pointer.x = (0.5) * 2 - 1;
+        pointer.y = -1 * (0.5) * 2 + 1;
+        raycaster.setFromCamera(pointer, camera);
+        var intersection = raycaster.intersectObjects(instancedChunk);
+        if(intersection[0] != undefined && intersection[0].distance < 40){
+            // finding x, y, z positions of that 
+            console.log(intersection[0].point);
+            var materialIndex = intersection[0].face.materialIndex;
+            var position = intersection[0].point; // object with x, y and z coords
+            var x = 0;
+            var y = 0;
+            var z = 0;
+            const inc = 2.5; 
+            switch(materialIndex){ // finding x, y, z positions of block
+                case 0: // right
+                    x = position.x - inc;
+                    y = Math.round(position.y / 5) * 5;
+                    z = Math.round(position.z / 5) * 5;
+                    break;
+                case 1: // left
+                    x = position.x + inc;
+                    y = Math.round(position.y / 5) * 5;
+                    z = Math.round(position.z / 5) * 5;
+                    break;
+                case 2: // top
+                    x = Math.round(position.x / 5) * 5;
+                    y = position.y - inc;
+                    z = Math.round(position.z / 5) * 5;
+                    break;
+                case 3: // bottom
+                    x = Math.round(position.x / 5) * 5;
+                    y = position.y + inc;
+                    z = Math.round(position.z / 5) * 5;
+                    break;
+                case 4: // front
+                    x = Math.round(position.x / 5) * 5;
+                    y = Math.round(position.y / 5) * 5;
+                    z = position.z - inc;
+                    break;
+                case 5: // back
+                    x = Math.round(position.x / 5) * 5;
+                    y = Math.round(position.y / 5) * 5;
+                    z = position.z + inc;
+                    break;
+            }
+            // Find block with those x, y, z positions
+            // More efficient by finding it inside it's chunk
+            var index1 = identifyChunk(x, z);
+            var chunk = chunks[index1];
+            y = Math.round(y); // sometimes, y is for some reason e.g 4.999999999999
+            for(var i = 0; i < chunk.length; i++){
+                if(chunk[i].x == x && chunk[i].y == y && chunk[i].z == z && chunk[i].placed){
+                    // Found the block!
+                    if(chunk[i].placed){
+                        // find the placedBlock and remove it
+                        for(var j = 0; j < placedBlocks.length; j++){
+                            if(placedBlocks[j].x == x && placedBlocks[j].y == y && placedBlocks[j].z == z){
+                                placedBlocks.splice(j, 1);
+                                break;
+                            }
+                        }
+                    } else { // if it is a normal block
+                        brokenBlocks.push({x : x, y : y, z : z});
+                    }
+                    chunks[index1].splice(i, 1); // block is removed from chunks variable
+
+                    break;
+                }
+            }
+
+            // update chunks, array.splice(index, 1);
+            instancedChunk.forEach((element, i) => {
+                if(element.position == intersection[0].object.position && intersection[0].object.position.y != 0){
+                    instancedChunk.splice(i, 1);
+                }
+            }); 
+            if(intersection[0].object.position.y != 0){
+                scene.remove(intersection[0].object);
+            }
+        }
+    }
+});
+controls.addEventListener("lock", function(){
+
+});
+controls.addEventListener("unlock", function(){
+    keys = [];
+});
+
+
+function intersect(x1, y1, z1, w1, h1, d1, x2, y2, z2, w2, h2, d2){
+    var a = {
+        minX : x1 - (w1/2),
+        maxX : x1 + (w1/2),
+        minZ : z1 - (d1/2),
+        maxZ : z1 + (d1/2),
+        minY : y1 - (h1/2),
+        maxY : y1 + (h1/2),
+    };
+    var b = {
+        minX : x2 - (w2/2),
+        maxX : x2 + (w2/2),
+        minZ : z2 - (d2/2),
+        maxZ : z2 + (d2/2),
+        minY : y2 - (h2/2),
+        maxY : y2 + (h2/2),
+    };
+    return (a.minX <= b.maxX && a.maxX >= b.minX) &&
+            (a.minY <= b.maxY && a.maxY >= b.minY) &&
+            (a.minZ <= b.maxZ && a.maxZ >= b.minZ);
+}
+
+function update(){	
+    player.updatePosition();
+
+    if(keys.includes(controlOptions.forward)){
+        player.forward(movingSpeed * (sprint ? sprintSpeedInc : 1));
+        forback = 1 * movingSpeed;
+        for(var i = 0; i < chunks.length; i++){
+            for(var j = 0; j < chunks[i].length; j++){
+                var b = chunks[i][j];
+                var c = intersect(b.x, b.y, b.z, 5, 5, 5, player.x, player.y, player.z, player.w, player.h, player.d);
+                if(c && (b.y - 2.5 < player.y + (player.h / 2) && b.y + 2.5 > player.y - (player.h / 2))){
+                    player.backward((movingSpeed * (sprint ? sprintSpeedInc : 1)));
+                    forback = 0;
+                    rightleft = 0;
+                    sprint = false;
+                }
+            }
+        }
+    }
+    if(keys.includes(controlOptions.backward)){
+        player.backward(movingSpeed * (sprint ? sprintSpeedInc : 1));
+        forback = -1 * movingSpeed;
+        for(var i = 0; i < chunks.length; i++){
+            for(var j = 0; j < chunks[i].length; j++){
+                var b = chunks[i][j];
+                var c = intersect(b.x, b.y, b.z, 5, 5, 5, player.x, player.y, player.z, player.w, player.h, player.d);
+                if(c && (b.y - 2.5 < player.y + (player.h / 2) && b.y + 2.5 > player.y - (player.h / 2))){
+                    player.forward(movingSpeed * (sprint ? sprintSpeedInc : 1));
+                    forback = 0;
+                    rightleft = 0;
+                    sprint = false;
+                }
+            }
+        }
+    }
+    if(keys.includes(controlOptions.right)){
+        player.right(movingSpeed * (sprint ? sprintSpeedInc : 1));
+        rightleft = 1 * movingSpeed;
+        for(var i = 0; i < chunks.length; i++){
+            for(var j = 0; j < chunks[i].length; j++){
+                var b = chunks[i][j];
+                var c = intersect(b.x, b.y, b.z, 5, 5, 5, player.x, player.y, player.z, player.w, player.h, player.d);
+                if(c && (b.y - 2.5 < player.y + (player.h / 2) && b.y + 2.5 > player.y - (player.h / 2))){
+                    player.left(movingSpeed * (sprint ? sprintSpeedInc : 1));
+                    forback = 0;
+                    rightleft = 0;
+                    sprint = false;
+                }
+            }
+        }
+    }
+    if(keys.includes(controlOptions.left)){
+        player.left(movingSpeed * (sprint ? sprintSpeedInc : 1));
+        rightleft = -1 * movingSpeed;
+        for(var i = 0; i < chunks.length; i++){
+            for(var j = 0; j < chunks[i].length; j++){
+                var b = chunks[i][j];
+                var c = intersect(b.x, b.y, b.z, 5, 5, 5, player.x, player.y, player.z, player.w, player.h, player.d);
+                if(c && (b.y - 2.5 < player.y + (player.h / 2) && b.y + 2.5 > player.y - (player.h / 2))){
+                    player.right(movingSpeed * (sprint ? sprintSpeedInc : 1));
+                    forback = 0;
+                    rightleft = 0;
+                    sprint = false;
+                }
+            }
+        }
+    }
+
+    // Decceleration part
+    if(!keys.includes(controlOptions.forward) && !keys.includes(controlOptions.backward) && !keys.includes(controlOptions.right) && !keys.includes(controlOptions.left)){
+        forback /= deceleration;
+        rightleft /= deceleration;
+        for(var i = 0; i < chunks.length; i++){
+            for(var j = 0; j < chunks[i].length; j++){
+                var b = chunks[i][j];
+                var c = intersect(b.x, b.y, b.z, 5, 5, 5, player.x, player.y, player.z, player.w, player.h, player.d);
+                if(c && (b.y - 2.5 < player.y + (player.h / 2) && b.y + 2.5 > player.y - (player.h / 2))){
+                    var br = true;
+                    forback /= -deceleration;
+                    rightleft /= -deceleration;
+                    sprint = false;
+                    break;
+                }
+            }
+            if(br){
+                break;
+            }
+        }
+        player.forward(forback * (sprint ? sprintSpeedInc : 1));
+        player.right(rightleft * (sprint ? sprintSpeedInc : 1));
+    }
     
+    camera.position.y = camera.position.y - ySpeed;
+    ySpeed = ySpeed + acc;
+
+    // Not falling through a block or above a block (above collision)
+    for(var i = 0; i < chunks.length; i++){
+        for(var j = 0; j < chunks[i].length; j++){
+            var b = chunks[i][j];
+            var c = intersect(b.x, b.y + 10, b.z, 5, 5, 5, player.x, player.y, player.z, player.w, player.h, player.d);
+            if(c && camera.position.y <= chunks[i][j].y + 2.5 + player.h && camera.position.y >= chunks[i][j].y){
+                camera.position.y = chunks[i][j].y + 2.5 + player.h;
+                ySpeed = 0;
+                canJump = true;
+            }
+            var c = intersect(b.x, b.y, b.z, 5, 5, 5, player.x, player.y, player.z, player.w, player.h, player.d); // this one doesn't have a + 10 in the b.y
+            if(c && camera.position.y >= chunks[i][j].y - 2.5 && camera.position.y <= chunks[i][j].y){
+                ySpeed = 0.5;
+            }
+        }
+    }
 }
 
-// EVENT LISTENERS & HANDLERS
-document.addEventListener("DOMContentLoaded", init);
-window.addEventListener("click", onDocumentMouseDown, false);
+function lowestXBlock(){
+    var xPosArray = [];
+    for(var i = 0; i < chunks.length; i++){
+        for(var j = 0; j < chunks[i].length; j++){
+            xPosArray.push(chunks[i][j].x);
+        }
+    }
+    return Math.min.apply(null, xPosArray);
+}
 
-window.addEventListener("resize", function () {
+function highestXBlock(){
+    var xPosArray = [];
+    for(var i = 0; i < chunks.length; i++){
+        for(var j = 0; j < chunks[i].length; j++){
+            xPosArray.push(chunks[i][j].x);
+        }
+    }
+    return Math.max.apply(null, xPosArray);
+}
+
+function lowestZBlock(){
+    var zPosArray = [];
+    for(var i = 0; i < chunks.length; i++){
+        for(var j = 0; j < chunks[i].length; j++){
+            zPosArray.push(chunks[i][j].z);
+        }
+    }
+    return Math.min.apply(null, zPosArray);
+}
+
+function highestZBlock(){
+    var zPosArray = [];
+    for(var i = 0; i < chunks.length; i++){
+        for(var j = 0; j < chunks[i].length; j++){
+            zPosArray.push(chunks[i][j].z);
+        }
+    }
+    return Math.max.apply(null, zPosArray);
+}
+
+// Resize Window
+window.addEventListener("resize", function(){
     renderer.setSize(window.innerWidth, window.innerHeight);
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
 });
 
-function onDocumentMouseDown(event) {
-    event.preventDefault();
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+pointer.x = (0.5) * 2 - 1;
+pointer.y = -1 * (0.5) * 2 + 1;
 
-    mouse.x = (event.clientX / renderer.domElement.clientWidth) * 2 - 1;
-    mouse.y = -(event.clientY / renderer.domElement.clientHeight) * 2 + 1;
-
-    raycaster.setFromCamera(mouse, camera);
-
-    var intersects = raycaster.intersectObjects(scene.children);
-
-    for (var i = 0; i < intersects.length; i++) {
-        let element = intersects[i];
-        if (
-        element.object != scene.children[0] &&
-        element.object != scene.children[1]
-        ) {
-        element.object.callback();
-        break;
+var plane;
+function render(){
+    raycaster.setFromCamera(pointer, camera);
+    var intersection = raycaster.intersectObjects(instancedChunk, true);
+    if(intersection[0] != undefined && intersection[0].distance < 40){
+        if(!scene.children.includes(plane)){
+            var planeG = new THREE.PlaneGeometry(5, 5);
+            var planeM = new THREE.MeshBasicMaterial({color : 0xffffff, side : THREE.DoubleSide});
+            planeM.transparent = true;
+            planeM.opacity = 0.5;
+            plane = new THREE.Mesh(planeG, planeM);
+            scene.add(plane);
+        } else {
+            plane.visible = true;
+            var materialIndex = intersection[0].face.materialIndex;
+            var position = intersection[0].point; // object with x, y and z coords
+            var x = 0;
+            var y = 0;
+            var z = 0;
+            const inc = 0.1; 
+            switch(materialIndex){
+                case 0: // right
+                    plane.rotation.x = 0;
+                    plane.rotation.y = (Math.PI / 2);
+                    plane.rotation.z = 0;
+                    x = position.x + inc;
+                    y = Math.round(position.y / 5) * 5;
+                    z = Math.round(position.z / 5) * 5;
+                    break;
+                case 1: // left
+                    plane.rotation.x = 0;
+                    plane.rotation.y = (Math.PI / 2);
+                    plane.rotation.z = 0;
+                    x = position.x - inc;
+                    y = Math.round(position.y / 5) * 5;
+                    z = Math.round(position.z / 5) * 5;
+                    break;
+                case 2: // top
+                    plane.rotation.x = (Math.PI / 2);
+                    plane.rotation.y = 0;
+                    plane.rotation.z = 0;
+                    x = Math.round(position.x / 5) * 5;
+                    y = position.y + inc;
+                    z = Math.round(position.z / 5) * 5;
+                    break;
+                case 3: // bottom
+                    plane.rotation.x = (Math.PI / 2);
+                    plane.rotation.y = 0;
+                    plane.rotation.z = 0;
+                    x = Math.round(position.x / 5) * 5;
+                    y = position.y - inc;
+                    z = Math.round(position.z / 5) * 5;
+                    break;
+                case 4: // front
+                    plane.rotation.x = 0;
+                    plane.rotation.y = 0;
+                    plane.rotation.z = 0;
+                    x = Math.round(position.x / 5) * 5;
+                    y = Math.round(position.y / 5) * 5;
+                    z = position.z + inc;
+                    break;
+                case 5: // back
+                    plane.rotation.x = 0;
+                    plane.rotation.y = 0;
+                    plane.rotation.z = 0;
+                    x = Math.round(position.x / 5) * 5;
+                    y = Math.round(position.y / 5) * 5;
+                    z = position.z - inc;
+                    break;
+            }
+            plane.position.x = x;
+            plane.position.y = y;
+            plane.position.z = z;
+        }
+    } else {
+        if(plane){
+            plane.visible = false;
         }
     }
+
+    renderer.render(scene, camera);
 }
+
+function renderLoop() {
+    stats.begin();
+    renderer.render(scene, camera); // DRAW SCENE
+    update();
+    stats.end();
+    stats.update();
+    render();
+    requestAnimationFrame(renderLoop);
+}
+
+// EVENT LISTENERS & HANDLERS
+document.addEventListener("DOMContentLoaded", init);
