@@ -309,9 +309,6 @@ function init(){
     let rectLightMenu = lightsMenu.addFolder("Rect Area Light");
     let spotLightMenu = lightsMenu.addFolder("Spot Light");
 
-    //Plane Appereance Menu
-    let planeMenu = gui.addFolder("Plane");
-
     let listMaterial = gui.add(model, 'selectedMaterialName', model.materialList).name("Material List").listen().onChange((item) => {
         switch(item){
             case 'grass':
