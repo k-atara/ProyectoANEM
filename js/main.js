@@ -486,7 +486,7 @@ function init(){
         scene.remove(skybox);
 
         // MODELS
-        geometry = new THREE.BoxGeometry(1000, 1000, 1000);
+        geometry = new THREE.BoxGeometry(500, 500, 500);
 
         let cubeMaterials = [
             new THREE.MeshBasicMaterial({map:texture1, side: THREE.DoubleSide}),
@@ -498,6 +498,7 @@ function init(){
         ]
         // MESH
         skybox = new THREE.Mesh(geometry, cubeMaterials);
+        skybox.position.set(renderDistance * chunkSize / 2 * 5, 10, renderDistance * chunkSize / 2 * 5)
 
         // SCENE HIERARCHY
         scene.add(skybox);
