@@ -127,8 +127,8 @@ function init(){
 
     //DirectionalLight
     let directionalLight = new THREE.DirectionalLight(0xFFFFFF, 2);
-    directionalLight.position.set(0,10,0);
-    directionalLight.target.position.set(0,5,0);
+    directionalLight.position.set(renderDistance * chunkSize / 2 * 5,10,renderDistance * chunkSize / 2 * 5);
+    directionalLight.target.position.set(renderDistance * chunkSize / 2 * 5,5,renderDistance * chunkSize / 2 * 5);
     let directionalLightHelper = new THREE.DirectionalLightHelper(directionalLight);
     directionalLight.castShadow = true;
     
@@ -138,7 +138,7 @@ function init(){
     let distance = 0;
     let decay = 1; 
     let pointLight = new THREE.PointLight(pointLightColor, intensity, distance, decay);
-    pointLight.position.set(0, 3, 0);
+    pointLight.position.set(renderDistance * chunkSize / 2 * 5, 3, renderDistance * chunkSize / 2 * 5);
     let pointLightHelper = new THREE.PointLightHelper(pointLight, 0.1);
     pointLight.castShadow = true;
     
@@ -148,7 +148,7 @@ function init(){
     let width = 12;
     let height = 4;
     let rectLight = new THREE.RectAreaLight(color, intensity, width, height);
-    rectLight.position.set(0, 10, 0);
+    rectLight.position.set(renderDistance * chunkSize / 2 * 5, 10, renderDistance * chunkSize / 2 * 5);
     rectLight.rotation.x = THREE.MathUtils.degToRad(-90);
     //let rectAreaLightHelper = new RectAreaLightHelper(rectLight);
 
@@ -156,37 +156,64 @@ function init(){
     color = 0xFFFFFF;
     intensity = 1;
     let spotLight = new THREE.SpotLight(color, intensity);
-    spotLight.position.set(0, 10, 0);
+    spotLight.position.set(renderDistance * chunkSize / 2 * 5, 10, renderDistance * chunkSize / 2 * 5);
     spotLight.target.position.set(-5, 0, 0);
     let spotLightHelper = new THREE.SpotLightHelper(spotLight);
     spotLight.castShadow = true;
 
     var loader = new THREE.TextureLoader();
     let materialArray = [
-        new THREE.MeshStandardMaterial({map : loader.load("texture/side4.jpg")}),
-        new THREE.MeshStandardMaterial({map : loader.load("texture/side1.jpg")}),
-        new THREE.MeshStandardMaterial({map : loader.load("texture/top.jpg")}),
-        new THREE.MeshStandardMaterial({map : loader.load("texture/bottom.jpg")}),
-        new THREE.MeshStandardMaterial({map : loader.load("texture/side2.jpg")}),
-        new THREE.MeshStandardMaterial({map : loader.load("texture/side3.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/grid.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/grid.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/grid.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/grid.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/grid.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/grid.jpg")}),
+    ];
+
+    let grassMaterialArray = [
+        new THREE.MeshStandardMaterial({map : loader.load("texture/grass.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/grass.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/grass.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/grass.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/grass.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/grass.jpg")}),
     ];
 
     let dirtMaterialArray = [
-        new THREE.MeshStandardMaterial({map : loader.load("texture/bottom.jpg")}),
-        new THREE.MeshStandardMaterial({map : loader.load("texture/bottom.jpg")}),
-        new THREE.MeshStandardMaterial({map : loader.load("texture/bottom.jpg")}),
-        new THREE.MeshStandardMaterial({map : loader.load("texture/bottom.jpg")}),
-        new THREE.MeshStandardMaterial({map : loader.load("texture/bottom.jpg")}),
-        new THREE.MeshStandardMaterial({map : loader.load("texture/bottom.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/dirt.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/dirt.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/dirt.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/dirt.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/dirt.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/dirt.jpg")}),
     ];
 
     let woodMaterialArray = [
-        new THREE.MeshStandardMaterial({map : loader.load("texture/wood.png")}),
-        new THREE.MeshStandardMaterial({map : loader.load("texture/wood.png")}),
-        new THREE.MeshStandardMaterial({map : loader.load("texture/wood.png")}),
-        new THREE.MeshStandardMaterial({map : loader.load("texture/wood.png")}),
-        new THREE.MeshStandardMaterial({map : loader.load("texture/wood.png")}),
-        new THREE.MeshStandardMaterial({map : loader.load("texture/wood.png")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/wood.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/wood.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/wood.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/wood.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/wood.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/wood.jpg")}),
+    ];
+
+    let tileMaterialArray = [
+        new THREE.MeshStandardMaterial({map : loader.load("texture/tile.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/tile.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/tile.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/tile.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/tile.jpg")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/tile.jpg")}),
+    ];
+
+    let brickMaterialArray = [
+        new THREE.MeshStandardMaterial({map : loader.load("texture/brick.png")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/brick.png")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/brick.png")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/brick.png")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/brick.png")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/brick.png")}),
     ];
 
     let stoneMaterialArray = [
@@ -249,9 +276,9 @@ function init(){
     let listSkys = ["None", "Blue Clouds", "Blue", "Yellow", "Gray", "Brown", "Interestelar", "Red Dark", "Blue Dark", "Blue Light", "Nebulas", "Space", "Tron"];
 
     model = {
-        selectedMaterial: materialArray,
+        selectedMaterial: grassMaterialArray,
         selectedMaterialName: 'grass',
-        materialList: ["grass", "dirt", "wood", "stone", "metal", "metal (shader)", "glass", "door"],
+        materialList: ["grass", "dirt", "wood", "stone", "metal", "metal (shader)", "glass", "brick", "tile", "grid", "door"],
         listSkys,
         defaultSky: listSkys[0],
         colorPalette: [0, 0, 0],
@@ -285,7 +312,7 @@ function init(){
     let listMaterial = gui.add(model, 'selectedMaterialName', model.materialList).name("Material List").listen().onChange((item) => {
         switch(item){
             case 'grass':
-                model.selectedMaterial = materialArray; 
+                model.selectedMaterial = grassMaterialArray; 
                 break;
             case 'dirt':
                 model.selectedMaterial = dirtMaterialArray; 
@@ -304,6 +331,15 @@ function init(){
                 break;
             case 'glass':
                 model.selectedMaterial = glassMaterialArray; 
+                break;
+            case 'grid':
+                model.selectedMaterial = gridMaterialArray; 
+                break;
+            case 'brick':
+                model.selectedMaterial = brickMaterialArray; 
+                break;
+            case 'tile':
+                model.selectedMaterial = tileMaterialArray; 
                 break;
             default:
                 model.selectedMaterial = materialArray; 
