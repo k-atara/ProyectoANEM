@@ -11,11 +11,13 @@ import { RectAreaLightHelper }  from '../js/jsm/helpers/RectAreaLightHelper.js';
 "using strict";
 
 
-let renderer, scene, camera, cameraControl, skybox, stats, mesh, start, sprint, blockBox;
+let renderer, scene, camera, camera2, camera3, camera4, skybox, stats, mesh, start, sprint, blockBox;
 let texture1, texture2, texture3, texture4, texture5, texture6;
 let geometry, model; 
 
 let spotLightHelper, cameraHelper;
+
+var multiview = false;
 
 var deceleration = 1.15;
 var forback = 0; // 1 = forward, -1 = backward
@@ -121,26 +123,6 @@ var controlOptions = {
     jump : " ", // " " = space
     placeBlock : "q" 
 };
-var faces = [
-    { // left
-        dir: [ -5,  0,  0, "left"],
-    },
-    { // right
-        dir: [  5,  0,  0, "right"],
-    },
-    { // bottom
-        dir: [  0, -5,  0, "bottom"],
-    },
-    { // top
-        dir: [  0,  5,  0, "top"],
-    },
-    { // back
-        dir: [  0,  0, -5, "back"],
-    },
-    { // front
-        dir: [  0,  0,  5, "front"],
-    },
-];
 
 function Block(x, y, z, material, placed){
     this.x = x;
@@ -162,13 +144,40 @@ var chunkMap = [];
 function init(){
 
     scene = new THREE.Scene();
-    renderer = new THREE.WebGLRenderer();
+    renderer = new THREE.WebGLRenderer({antialias: true});
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setScissorTest(true);
     document.body.appendChild(renderer.domElement);
+
+    let fov = 75;
+    let aspect = window.innerWidth / window.innerHeight;
+    let near = 0.1;
+    let far = 1000;
     
     camera.position.x = renderDistance * chunkSize / 2 * 5;
     camera.position.z = renderDistance * chunkSize / 2 * 5;
     camera.position.y = 50;
+
+    let cwidth = renderDistance * chunkSize / 2 * 5;
+    let cheight = renderDistance * chunkSize / 2 * 5;
+
+     // CAMERA 2 (Top View)
+     camera2 = new THREE.OrthographicCamera( -cwidth, cwidth, cheight, -cheight, near, far );
+     camera2.position.set(cwidth, 10, cwidth);
+     camera2.lookAt(cwidth, 0, cwidth);
+     camera2.up.set(0, 0, 1);
+
+     // CAMERA 3 (Front View)
+     camera3 = new THREE.OrthographicCamera( -cwidth, cwidth, 120, 0, near, far );
+     camera3.position.set(cwidth, 0, 0);
+     camera3.lookAt(cwidth, 0, cwidth);
+     camera3.up.set(0, 0, 1);
+
+     // CAMERA 4 (Side View)
+     camera4 = new THREE.OrthographicCamera( -cwidth, cwidth, 120, 0, near, far );
+     camera4.position.set(0, 0, cwidth);
+     camera4.lookAt(cwidth, 0, cwidth);
+     camera4.up.set(0, 0, 1);
 
      //LIGHTS
 
@@ -758,6 +767,10 @@ document.addEventListener("keydown", function(e){
 
     keys.push(e.key);
 
+    if(e.key == 'e'){
+        multiview = !multiview;
+    }
+
     if(e.key == controlOptions.jump && canJump == true){
         ySpeed = -1;
         canJump = false;
@@ -1245,7 +1258,41 @@ function render(){
 
 function renderLoop() {
     stats.begin();
-    renderer.render(scene, camera); // DRAW SCENE
+    if(!multiview){
+        // CAMERA 1
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+        renderer.setScissor(0, 0, window.innerWidth, window.innerHeight);
+        renderer.render(scene, camera); // DRAW SCENE
+    }else{
+        // CAMERA 1
+        camera4.aspect = window.innerWidth / window.innerHeight;
+        camera4.updateProjectionMatrix();
+        renderer.setViewport(window.innerWidth / 2, window.innerHeight / 2, window.innerWidth / 2, window.innerHeight / 2);
+        renderer.setScissor(window.innerWidth / 2, window.innerHeight / 2, window.innerWidth / 2, window.innerHeight / 2);
+        renderer.render(scene, camera4); // DRAW SCENE
+        // CAMERA 2
+        camera2.aspect = window.innerWidth / window.innerHeight;
+        camera2.updateProjectionMatrix();
+        renderer.setViewport(0, window.innerHeight / 2, window.innerWidth / 2, window.innerHeight / 2);
+        renderer.setScissor(0, window.innerHeight / 2, window.innerWidth / 2, window.innerHeight / 2);
+        renderer.render(scene, camera2); // DRAW SCENE
+
+        // CAMERA 3
+        camera3.aspect = window.innerWidth / window.innerHeight;
+        camera3.updateProjectionMatrix();
+        renderer.setViewport(0, 0, window.innerWidth / 2, window.innerHeight / 2);
+        renderer.setScissor(0, 0, window.innerWidth / 2, window.innerHeight / 2);
+        renderer.render(scene, camera3); // DRAW SCENE
+
+        // CAMERA 4
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setViewport(window.innerWidth / 2, 0, window.innerWidth / 2, window.innerHeight / 2);
+        renderer.setScissor(window.innerWidth / 2, 0, window.innerWidth / 2, window.innerHeight / 2);
+        renderer.render(scene, camera); // DRAW SCENE
+    }
     update();
     stats.end();
     stats.update();
