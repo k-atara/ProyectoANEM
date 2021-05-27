@@ -28,6 +28,59 @@ var acc = 0.065;
 
 camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 
+class Mesh extends THREE.Mesh {
+    constructor() {
+        super();
+    }
+    setWireframe(value) {
+        this.material.wireframe = value;
+    }
+    callback = function () {
+        mesh = this;
+        model.name = this.name;
+        model.wireframe = this.material.wireframe;
+        model.posX = this.position.x;
+        model.posY = this.position.y;
+        model.posZ = this.position.z;
+        model.rotX = (this.rotation.x * 180) / Math.PI;
+        model.rotY = (this.rotation.y * 180) / Math.PI;
+        model.rotZ = (this.rotation.z * 180) / Math.PI;
+        model.colorPalette = [
+        mesh.material.color.r * 255,
+        mesh.material.color.g * 255,
+        mesh.material.color.b * 255,
+        ];
+    };
+}
+
+class Window extends Mesh {
+    constructor(){
+        super();
+        //CUBE
+        let vertices = [-2.5,-2.5,-1,    
+                        2.5,-2.5,-1,    
+                        2.5, 2.5,-1,    
+                        -2.5, 2.5,-1,
+                        -2.5,-2.5, 1,    
+                        2.5,-2.5, 1,    
+                        2.5, 2.5, 1,    
+                        -2.5, 2.5, 1];
+        let indices = [2,1,0,    0,3,2,
+                        0,4,7,    7,3,0,
+                        0,1,5,    5,4,0,
+                        1,2,6,    6,5,1,
+                        2,3,7,    7,6,2,
+                        4,5,6,    6,7,4];
+        this.geometry = new THREE.BufferGeometry();
+        this.geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        this.geometry.setIndex(indices);
+        this.material = new THREE.MeshPhongMaterial({
+            opacity: 0.2,
+            transparent: true,
+        });
+    }
+}
+
 var player = {
     w : 0.6, // width
     h : 8, // height
@@ -281,7 +334,7 @@ function init(){
     model = {
         selectedMaterial: grassMaterialArray,
         selectedMaterialName: 'grass',
-        materialList: ["grass", "dirt", "wood", "stone", "metal", "metal (shader)", "glass", "brick", "tile", "grid", "door"],
+        materialList: ["grass", "dirt", "wood", "stone", "metal", "metal (shader)", "glass", "brick", "tile", "grid", "door", "window"],
         listSkys,
         defaultSky: listSkys[0],
         colorPalette: [0, 0, 0],
@@ -642,11 +695,6 @@ function init(){
                 for(var z = j * chunkSize; z < (j * chunkSize) + chunkSize; z++){
                     var v = 0;
                     chunk.push(new Block(x * 5, v, z * 5, materialArray, false));
-                    let matrix = new THREE.Matrix4().makeTranslation(
-                        x * 5,
-                        v,
-                        z * 5
-                    );
                     instancedChunk[count] = new THREE.Mesh(blockBox, materialArray);
                     instancedChunk[count].position.set(x * 5 ,v,z * 5);
                     count++;
@@ -789,7 +837,16 @@ document.addEventListener("keydown", function(e){
                             scene.add(instancedChunk[instancedChunk.length -1]);
                         });
                     });
-                }else{
+                }
+                else if (model.selectedMaterialName == 'window'){
+                    chunks[identifyChunk(x, z)].push(new Block(x, y, z, model.selectedMaterial, true));
+                    placedBlocks.push(b);
+                    let addedBlock = new Window();
+                    addedBlock.position.set(x, y, z);
+                    instancedChunk.push(addedBlock);
+                    scene.add(instancedChunk[instancedChunk.length -1]);
+                }
+                else{
                     chunks[identifyChunk(x, z)].push(new Block(x, y, z, model.selectedMaterial, true));
                     placedBlocks.push(b);
                     let addedBlock = new  THREE.Mesh(blockBox, model.selectedMaterial);
