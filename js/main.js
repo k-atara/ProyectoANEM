@@ -415,9 +415,9 @@ function init(){
     pointLightMenu.add(pointLight, "decay").min(0).max(4).step(0.1).name("Decay").listen().onChange(function(value){ });
     pointLightMenu.add(pointLight, "power").min(0).max(1220).step(0.1).name("Power").listen().onChange(function(value){ });
     pointLightMenu.add(pointLight, "distance").min(0).max(20).step(0.1).name("Distance").listen().onChange(function(value){ });
-    pointLightMenu.add(pointLight.position, "x").min(0).max(250).step(5.0).setValue(0).name("Point Light X").listen().onChange(function(value){ });
-    pointLightMenu.add(pointLight.position, "y").min(4).max(150).step(2.0).setValue(2).name("Point Light Y").listen().onChange(function(value){ });
-    pointLightMenu.add(pointLight.position, "z").min(0).max(250).step(5.0).setValue(0).name("Point Light Z").listen().onChange(function(value){ });
+    pointLightMenu.add(pointLight.position, "x").min(0).max(250).step(5.0).setValue(125).name("Point Light X").listen().onChange(function(value){ });
+    pointLightMenu.add(pointLight.position, "y").min(4).max(150).step(2.0).setValue(15).name("Point Light Y").listen().onChange(function(value){ });
+    pointLightMenu.add(pointLight.position, "z").min(0).max(250).step(5.0).setValue(125).name("Point Light Z").listen().onChange(function(value){ });
     pointLightMenu.addColor(model, "pointColor").name("Point Color").listen().onChange(function(color){
         pointLight.color = new THREE.Color(color[0]/256, color[1]/256, color[2]/256);
         pointLightHelper = new THREE.PointLightHelper(pointLight, 0.1);
@@ -437,7 +437,7 @@ function init(){
         }
     }
     rectLightMenu.add(rectLight, "visible").name("Rect Area Light").setValue(false).listen().onChange(function(value) { });
-    //rectLightMenu.add(rectAreaLightHelper, "visible").name("Helper").setValue(false).listen().onChange(function(value) { });
+    rectLightMenu.add(rectAreaLightHelper, "visible").name("Helper").setValue(false).listen().onChange(function(value) { });
     rectLightMenu.add(rectLight, "intensity").min(0).max(10).step(0.1).name("Intensidad").listen().onChange(function(value){ });
     rectLightMenu.add(rectLight, 'width', 0, 20);
     rectLightMenu.add(rectLight, 'height', 0, 20);
@@ -446,10 +446,9 @@ function init(){
     rectLightMenu.add(new DegRadHelper(rectLight.rotation, 'y'), 'value', -180, 180).name('y rotation');
     rectLightMenu.add(new DegRadHelper(rectLight.rotation, 'z'), 'value', -180, 180).name('z rotation');
 
-
-    rectLightMenu.add(rectLight.position, "x").min(0).max(250).step(5).setValue(0).name("Rect Light X").listen().onChange(function(value){ });
-    rectLightMenu.add(rectLight.position, "y").min(0).max(150).step(5).setValue(2).name("Rect Light Y").listen().onChange(function(value){ });
-    rectLightMenu.add(rectLight.position, "z").min(0).max(250).step(5).setValue(0).name("Rect Light Z").listen().onChange(function(value){ });
+    rectLightMenu.add(rectLight.position, "x").min(0).max(250).step(5).setValue(125).name("Rect Light X").listen().onChange(function(value){ });
+    rectLightMenu.add(rectLight.position, "y").min(0).max(150).step(5).setValue(15).name("Rect Light Y").listen().onChange(function(value){ });
+    rectLightMenu.add(rectLight.position, "z").min(0).max(250).step(5).setValue(125).name("Rect Light Z").listen().onChange(function(value){ });
     rectLightMenu.addColor(model, "rectColor").name("Rect Color").listen().onChange(function(color){
         rectLight.color = new THREE.Color(color[0]/256, color[1]/256, color[2]/256);
     });
