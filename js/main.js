@@ -1,9 +1,16 @@
-
+import * as THREE from "/build/three.module.js";
+import Stats from "/js/jsm/libs/stats.module.js";
+import {OrbitControls} from "/js/jsm/controls/OrbitControls.js";
+import {PLYLoader} from "/js/jsm/loaders/PLYLoader.js";
+import {OBJLoader} from "/js/jsm/loaders/OBJLoader.js";
+import {MTLLoader} from "/js/jsm/loaders/MTLLoader.js";
+import * as dat from "/js/jsm/libs/dat.gui.module.js";
+import { PointerLockControls } from '/js/jsm/controls/PointerLockControls.js';
 "using strict";
 
 let renderer, scene, camera, cameraControl, skybox, stats, mesh, start, sprint, blockBox;
 let texture1, texture2, texture3, texture4, texture5, texture6;
-let materialArray, dirtMaterialArray, woodMaterialArray, model; 
+let geometry, model; 
 
 let spotLightHelper, cameraHelper;
 
@@ -102,21 +109,6 @@ function init(){
     renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
-
-    /*
-    var groundBox = new THREE.BoxBufferGeometry(25, 1, 50);
-    var groundMesh = new THREE.MeshBasicMaterial({color : 0x00ff00});
-    var ground = new THREE.Mesh(groundBox, groundMesh);
-    scene.add(ground);
-    ground.position.y = -5;
-
-    // Creating the border lines for ground
-    var edges = new THREE.EdgesGeometry(groundBox);
-    var line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({color : 0x000000}));
-    scene.add(line);
-    line.position.y = -5;
-    */
-
     
     camera.position.x = renderDistance * chunkSize / 2 * 5;
     camera.position.z = renderDistance * chunkSize / 2 * 5;
@@ -170,7 +162,7 @@ function init(){
     spotLight.castShadow = true;
 
     var loader = new THREE.TextureLoader();
-    materialArray = [
+    let materialArray = [
         new THREE.MeshStandardMaterial({map : loader.load("texture/side4.jpg")}),
         new THREE.MeshStandardMaterial({map : loader.load("texture/side1.jpg")}),
         new THREE.MeshStandardMaterial({map : loader.load("texture/top.jpg")}),
@@ -179,7 +171,7 @@ function init(){
         new THREE.MeshStandardMaterial({map : loader.load("texture/side3.jpg")}),
     ];
 
-    dirtMaterialArray = [
+    let dirtMaterialArray = [
         new THREE.MeshStandardMaterial({map : loader.load("texture/bottom.jpg")}),
         new THREE.MeshStandardMaterial({map : loader.load("texture/bottom.jpg")}),
         new THREE.MeshStandardMaterial({map : loader.load("texture/bottom.jpg")}),
@@ -188,7 +180,7 @@ function init(){
         new THREE.MeshStandardMaterial({map : loader.load("texture/bottom.jpg")}),
     ];
 
-    woodMaterialArray = [
+    let woodMaterialArray = [
         new THREE.MeshStandardMaterial({map : loader.load("texture/wood.png")}),
         new THREE.MeshStandardMaterial({map : loader.load("texture/wood.png")}),
         new THREE.MeshStandardMaterial({map : loader.load("texture/wood.png")}),
@@ -197,7 +189,7 @@ function init(){
         new THREE.MeshStandardMaterial({map : loader.load("texture/wood.png")}),
     ];
 
-    stoneMaterialArray = [
+    let stoneMaterialArray = [
         new THREE.MeshStandardMaterial({map : loader.load("texture/stone.png")}),
         new THREE.MeshStandardMaterial({map : loader.load("texture/stone.png")}),
         new THREE.MeshStandardMaterial({map : loader.load("texture/stone.png")}),
@@ -206,13 +198,49 @@ function init(){
         new THREE.MeshStandardMaterial({map : loader.load("texture/stone.png")}),
     ];
 
-    metalMaterialArray = [
+    let metalMaterialArray = [
+        new THREE.MeshStandardMaterial({map : loader.load("texture/metal.png")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/metal.png")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/metal.png")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/metal.png")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/metal.png")}),
+        new THREE.MeshStandardMaterial({map : loader.load("texture/metal.png")}),
+    ];
+
+    let metal2MaterialArray = [
         new THREE.MeshStandardMaterial({map : loader.load("texture/metal.png"), metalness: 1.0, roughness: 0.5}),
         new THREE.MeshStandardMaterial({map : loader.load("texture/metal.png"), metalness: 1.0, roughness: 0.5}),
         new THREE.MeshStandardMaterial({map : loader.load("texture/metal.png"), metalness: 1.0, roughness: 0.5}),
         new THREE.MeshStandardMaterial({map : loader.load("texture/metal.png"), metalness: 1.0, roughness: 0.5}),
         new THREE.MeshStandardMaterial({map : loader.load("texture/metal.png"), metalness: 1.0, roughness: 0.5}),
         new THREE.MeshStandardMaterial({map : loader.load("texture/metal.png"), metalness: 1.0, roughness: 0.5}),
+    ];
+
+    let glassMaterialArray = [
+        new THREE.MeshPhongMaterial({
+            opacity: 0.2,
+            transparent: true,
+        }),
+        new THREE.MeshPhongMaterial({
+            opacity: 0.2,
+            transparent: true,
+        }),
+        new THREE.MeshPhongMaterial({
+            opacity: 0.2,
+            transparent: true,
+        }),
+        new THREE.MeshPhongMaterial({
+            opacity: 0.2,
+            transparent: true,
+        }),
+        new THREE.MeshPhongMaterial({
+            opacity: 0.2,
+            transparent: true,
+        }),
+        new THREE.MeshPhongMaterial({
+            opacity: 0.2,
+            transparent: true,
+        }),
     ];
 
     //material gui 
@@ -222,7 +250,8 @@ function init(){
 
     model = {
         selectedMaterial: materialArray,
-        materialList: ["grass", "dirt", "wood", "stone", "metal"],
+        selectedMaterialName: 'grass',
+        materialList: ["grass", "dirt", "wood", "stone", "metal", "metal (shader)", "glass", "door"],
         listSkys,
         defaultSky: listSkys[0],
         colorPalette: [0, 0, 0],
@@ -253,7 +282,7 @@ function init(){
     //Plane Appereance Menu
     let planeMenu = gui.addFolder("Plane");
 
-    let listMaterial = gui.add(model, 'selectedMaterial', model.materialList).name("Material List").listen().onChange((item) => {
+    let listMaterial = gui.add(model, 'selectedMaterialName', model.materialList).name("Material List").listen().onChange((item) => {
         switch(item){
             case 'grass':
                 model.selectedMaterial = materialArray; 
@@ -269,6 +298,12 @@ function init(){
                 break;
             case 'metal':
                 model.selectedMaterial = metalMaterialArray; 
+                break;
+            case 'metal (shader)':
+                model.selectedMaterial = metal2MaterialArray; 
+                break;
+            case 'glass':
+                model.selectedMaterial = glassMaterialArray; 
                 break;
             default:
                 model.selectedMaterial = materialArray; 
@@ -291,7 +326,7 @@ function init(){
      //LIGHTS
 
     //Ambient Light
-    ambientLightMenu.add(ambientLight, "visible").name("Ambient Light").setValue(false).listen().onChange(function(value) { });
+    ambientLightMenu.add(ambientLight, "visible").name("Ambient Light").setValue(true).listen().onChange(function(value) { });
     ambientLightMenu.add(ambientLight, "intensity").min(0).max(2).step(0.1).name("Intensidad").listen().onChange(function(value){ });
     ambientLightMenu.addColor(model, "ambientColor").name("Ambient Color").listen().onChange(function(color){
         ambientLight.color = new THREE.Color(color[0]/256, color[1]/256, color[2]/256);
@@ -433,7 +468,16 @@ function init(){
         scene.background = new THREE.Color(color[0]/256, color[1]/256, color[2]/256);
     });
 
-    let listSky = skyMenu.add(model, "defaultSky", model.listSkys).name("Sky list options").listen().onChange(function(item){
+
+    texture1 = new THREE.TextureLoader().load('./../texture/bluecloud_ft.jpg');
+    texture2 = new THREE.TextureLoader().load('./../texture/bluecloud_bk.jpg');
+    texture3 = new THREE.TextureLoader().load('./../texture/bluecloud_up.jpg');
+    texture4 = new THREE.TextureLoader().load('./../texture/bluecloud_dn.jpg');
+    texture5 = new THREE.TextureLoader().load('./../texture/bluecloud_rt.jpg');
+    texture6 = new THREE.TextureLoader().load('./../texture/bluecloud_lf.jpg');
+    skyChange(texture1, texture2, texture3, texture4, texture5, texture6);
+
+    let listSky = skyMenu.add(model, "defaultSky", model.listSkys).name("Sky list options").setValue("Blue").listen().onChange(function(item){
         console.log(item);
         if(item=="None"){
             scene.remove(skybox);
@@ -556,7 +600,7 @@ function init(){
     blockBox = new THREE.BoxGeometry(5, 5, 5)
     var count = 0;
     for(var i = 0; i < renderDistance; i++){
-        for(j = 0; j < renderDistance; j++){
+        for(var j = 0; j < renderDistance; j++){
             var chunk = [];
             for(var x = i * chunkSize; x < (i * chunkSize) + chunkSize; x++){
                 for(var z = j * chunkSize; z < (j * chunkSize) + chunkSize; z++){
@@ -617,6 +661,9 @@ function identifyChunk(x, z){
 
 
 document.addEventListener("keydown", function(e){
+    if(e.key == "esc"){
+        controls.unlock();
+    }
     if(e.key == "w") {
         var elapsed = new Date().getTime();
         if(elapsed - start <= 300){
@@ -640,7 +687,7 @@ document.addEventListener("keydown", function(e){
         var intersection = raycaster.intersectObjects(instancedChunk, true);
 
         if(intersection[0] != undefined && intersection[0].distance < 40){
-            console.log(intersection[0]);
+
             var materialIndex = intersection[0].face.materialIndex;
             var position = intersection[0].point; // object with x, y and z coords
             var x = 0;
@@ -682,38 +729,38 @@ document.addEventListener("keydown", function(e){
             y = Math.round(y); // sometimes, y is for some reason e.g 4.999999999999
             var b = {x : x, y : y, z : z};
             if(!intersect(b.x, b.y, b.z, 5, 5, 5, player.x, player.y, player.z, player.w, player.h, player.d)){
-                chunks[identifyChunk(x, z)].push(new Block(x, y, z, model.selectedMaterial, true));
-                placedBlocks.push(b);
+                if(model.selectedMaterialName == 'door'){
+                    let mtlLoader = new MTLLoader();
+                    mtlLoader.load('./assets/obj/door.obj', function(materials) {
+                        materials.preload();
+                        var objLoader = new OBJLoader();
+                        objLoader.setMaterials(materials);
+                        objLoader.load('./assets/obj/door.obj', function (object) {
+                            var texture = new THREE.TextureLoader().load('./assets/obj/wood.jpg');
+                            
+                            object.traverse( function ( child ) {
+                                if ( child instanceof THREE.Mesh ) {
+                                    child.material.map = texture;
+                                }
+                            } );
 
-                /*
-                instancedChunk.forEach(element => {
-                    scene.remove(element);
-                });
-                scene.remove(instancedChunk);
-                */
-
-                let addedBlock = new  THREE.Mesh(blockBox, model.selectedMaterial);
-                addedBlock.position.set(x, y, z);
-                instancedChunk.push(addedBlock);
-                scene.add(instancedChunk[instancedChunk.length -1]);
-                /*
-                //instancedChunk = new THREE.InstancedMesh(blockBox, materialArray, (renderDistance * renderDistance * chunkSize * chunkSize) + placedBlocks.length);
-                instancedChunk = []
-                var count = 0;
-                for(var i = 0; i < chunks.length; i++){
-                    for(var j = 0; j < chunks[i].length; j++){
-                        let matrix = new THREE.Matrix4().makeTranslation(
-                            chunks[i][j].x,
-                            chunks[i][j].y,
-                            chunks[i][j].z
-                        );
-                        instancedChunk[count] = new THREE.Mesh(blockBox, materialArray);
-                        instancedChunk[count].position.set(chunks[i][j].x, chunks[i][j].y, chunks[i][j].z);
-                        count++;
-                    }
+                            object.position.set(x, y - 2.5, z);
+                            object.scale.set(.55, .333, .35)
+                            object.rotation.y = object.rotation.y - (Math.PI/2);
+                            
+                            console.log(object);
+                            instancedChunk.push(object);
+                            scene.add(instancedChunk[instancedChunk.length -1]);
+                        });
+                    });
+                }else{
+                    chunks[identifyChunk(x, z)].push(new Block(x, y, z, model.selectedMaterial, true));
+                    placedBlocks.push(b);
+                    let addedBlock = new  THREE.Mesh(blockBox, model.selectedMaterial);
+                    addedBlock.position.set(x, y, z);
+                    instancedChunk.push(addedBlock);
+                    scene.add(instancedChunk[instancedChunk.length -1]);
                 }
-                
-                */
             }		
         }
     }
@@ -731,7 +778,7 @@ document.addEventListener("keyup", function(e){
     }
 });
 
-var controls = new THREE.PointerLockControls(camera, document.body);
+var controls = new PointerLockControls(camera, document.body);
 var brokenBlocks = [];
 
 document.body.addEventListener("click", function(){
@@ -744,10 +791,13 @@ document.body.addEventListener("click", function(){
         pointer.x = (0.5) * 2 - 1;
         pointer.y = -1 * (0.5) * 2 + 1;
         raycaster.setFromCamera(pointer, camera);
-        var intersection = raycaster.intersectObjects(instancedChunk);
+        var intersection = raycaster.intersectObjects(instancedChunk, true);
+        
         if(intersection[0] != undefined && intersection[0].distance < 40){
+            if(intersection[0].object.parent.type == 'Group'){
+                intersection[0].object = intersection[0].object.parent;
+            };
             // finding x, y, z positions of that 
-            console.log(intersection[0].point);
             var materialIndex = intersection[0].face.materialIndex;
             var position = intersection[0].point; // object with x, y and z coords
             var x = 0;
@@ -829,7 +879,6 @@ controls.addEventListener("lock", function(){
 controls.addEventListener("unlock", function(){
     keys = [];
 });
-
 
 function intersect(x1, y1, z1, w1, h1, d1, x2, y2, z2, w2, h2, d2){
     var a = {
