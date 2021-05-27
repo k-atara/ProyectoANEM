@@ -6,7 +6,10 @@ import {OBJLoader} from "/js/jsm/loaders/OBJLoader.js";
 import {MTLLoader} from "/js/jsm/loaders/MTLLoader.js";
 import * as dat from "/js/jsm/libs/dat.gui.module.js";
 import { PointerLockControls } from '/js/jsm/controls/PointerLockControls.js';
+import { RectAreaLightHelper }  from '../js/jsm/helpers/RectAreaLightHelper.js';
+
 "using strict";
+
 
 let renderer, scene, camera, cameraControl, skybox, stats, mesh, start, sprint, blockBox;
 let texture1, texture2, texture3, texture4, texture5, texture6;
@@ -138,7 +141,7 @@ function init(){
     let distance = 0;
     let decay = 1; 
     let pointLight = new THREE.PointLight(pointLightColor, intensity, distance, decay);
-    pointLight.position.set(renderDistance * chunkSize / 2 * 5, 3, renderDistance * chunkSize / 2 * 5);
+    pointLight.position.set(renderDistance * chunkSize / 2 * 5, 10, renderDistance * chunkSize / 2 * 5);
     let pointLightHelper = new THREE.PointLightHelper(pointLight, 0.1);
     pointLight.castShadow = true;
     
@@ -148,16 +151,16 @@ function init(){
     let width = 12;
     let height = 4;
     let rectLight = new THREE.RectAreaLight(color, intensity, width, height);
-    rectLight.position.set(renderDistance * chunkSize / 2 * 5, 10, renderDistance * chunkSize / 2 * 5);
+    rectLight.position.set(0, 20, 0);
     rectLight.rotation.x = THREE.MathUtils.degToRad(-90);
-    //let rectAreaLightHelper = new RectAreaLightHelper(rectLight);
+    let rectAreaLightHelper = new RectAreaLightHelper(rectLight);
 
     //SpotLight
     color = 0xFFFFFF;
     intensity = 1;
     let spotLight = new THREE.SpotLight(color, intensity);
-    spotLight.position.set(renderDistance * chunkSize / 2 * 5, 10, renderDistance * chunkSize / 2 * 5);
-    spotLight.target.position.set(-5, 0, 0);
+    spotLight.position.set(renderDistance * chunkSize / 2 * 5,10,renderDistance * chunkSize / 2 * 5);
+    spotLight.target.position.set(renderDistance * chunkSize / 2 * 5,5,renderDistance * chunkSize / 2 * 5);
     let spotLightHelper = new THREE.SpotLightHelper(spotLight);
     spotLight.castShadow = true;
 
@@ -354,7 +357,7 @@ function init(){
     scene.add(pointLight);
     scene.add(pointLightHelper);
     scene.add(rectLight);
-    //scene.add(rectAreaLightHelper);
+    scene.add(rectAreaLightHelper);
     scene.add(spotLight);
     scene.add(spotLight.target);
     scene.add(spotLightHelper);
@@ -389,9 +392,9 @@ function init(){
     //Directional Light
     function makeXYZGUI(gui, vector3, name, onChangeFn) {
         let folder = gui.addFolder(name);
-        folder.add(vector3, 'x', -30, 30).onChange(onChangeFn);
-        folder.add(vector3, 'y', 0, 30).onChange(onChangeFn);
-        folder.add(vector3, 'z', -30, 30).onChange(onChangeFn);
+        folder.add(vector3, 'x', 0, 250).step(5.0).onChange(onChangeFn);
+        folder.add(vector3, 'y', -250, 200).step(5.0).onChange(onChangeFn);
+        folder.add(vector3, 'z', 0, 250).step(5.0).onChange(onChangeFn);
         folder.open();
     }
     function updateLight() {
@@ -415,9 +418,9 @@ function init(){
     pointLightMenu.add(pointLight, "decay").min(0).max(4).step(0.1).name("Decay").listen().onChange(function(value){ });
     pointLightMenu.add(pointLight, "power").min(0).max(1220).step(0.1).name("Power").listen().onChange(function(value){ });
     pointLightMenu.add(pointLight, "distance").min(0).max(20).step(0.1).name("Distance").listen().onChange(function(value){ });
-    pointLightMenu.add(pointLight.position, "x").min(-10).max(10).step(0.1).setValue(0).name("Point Light X").listen().onChange(function(value){ });
-    pointLightMenu.add(pointLight.position, "y").min(-10).max(10).step(0.1).setValue(2).name("Point Light Y").listen().onChange(function(value){ });
-    pointLightMenu.add(pointLight.position, "z").min(-10).max(10).step(0.1).setValue(0).name("Point Light Z").listen().onChange(function(value){ });
+    pointLightMenu.add(pointLight.position, "x").min(0).max(250).step(5.0).setValue(0).name("Point Light X").listen().onChange(function(value){ });
+    pointLightMenu.add(pointLight.position, "y").min(4).max(150).step(2.0).setValue(2).name("Point Light Y").listen().onChange(function(value){ });
+    pointLightMenu.add(pointLight.position, "z").min(0).max(250).step(5.0).setValue(0).name("Point Light Z").listen().onChange(function(value){ });
     pointLightMenu.addColor(model, "pointColor").name("Point Color").listen().onChange(function(color){
         pointLight.color = new THREE.Color(color[0]/256, color[1]/256, color[2]/256);
         pointLightHelper = new THREE.PointLightHelper(pointLight, 0.1);
@@ -447,9 +450,9 @@ function init(){
     rectLightMenu.add(new DegRadHelper(rectLight.rotation, 'z'), 'value', -180, 180).name('z rotation');
 
 
-    rectLightMenu.add(rectLight.position, "x").min(-10).max(10).step(0.1).setValue(0).name("Point Light X").listen().onChange(function(value){ });
-    rectLightMenu.add(rectLight.position, "y").min(-10).max(10).step(0.1).setValue(2).name("Point Light Y").listen().onChange(function(value){ });
-    rectLightMenu.add(rectLight.position, "z").min(-10).max(10).step(0.1).setValue(0).name("Point Light Z").listen().onChange(function(value){ });
+    rectLightMenu.add(rectLight.position, "x").min(0).max(250).step(5).setValue(0).name("Rect Light X").listen().onChange(function(value){ });
+    rectLightMenu.add(rectLight.position, "y").min(0).max(150).step(5).setValue(2).name("Rect Light Y").listen().onChange(function(value){ });
+    rectLightMenu.add(rectLight.position, "z").min(0).max(250).step(5).setValue(0).name("Rect Light Z").listen().onChange(function(value){ });
     rectLightMenu.addColor(model, "rectColor").name("Rect Color").listen().onChange(function(color){
         rectLight.color = new THREE.Color(color[0]/256, color[1]/256, color[2]/256);
     });
